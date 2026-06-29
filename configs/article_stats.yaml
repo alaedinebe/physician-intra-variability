@@ -1,0 +1,72 @@
+# Synthetic SCORE2 pipeline configuration (used by main.py).
+#
+# generation_strategy options:
+#   score2_five_groups_heter_patients  (default; requires score2_five_groups)
+#   score2_continuous_heterogeneity    (add a continuous_heterogeneity block)
+#   score2_latent_covariate            (add a latent_covariate block)
+
+project:
+  random_state: 42
+  default_experiment_name: "intra-physician-variability"
+
+paths:
+  experiments_root: "experiments"
+  experiments_date_format: "%y_%m_%d"
+  scratch_dirname_prefix: "exp"
+
+logging:
+  level: "info"
+
+dataset:
+  generation_strategy: "score2_five_groups_heter_patients"
+  score2_five_groups:
+    n_patients: 20000
+    n_physicians: 20
+    random_state_offset: 100  # effective seed = random_state + offset
+  covariate_correlation:
+    enabled: true
+    var_a: "non_hdl_cholesterol"
+    var_b: "ldl_cholesterol"
+    rho: 0.8
+  hba1c_distribution:
+    law: "normal"  # normal | lognormal
+
+analysis:
+  outcome_col: "recommendation"
+  physician_col: "professional_id"
+  min_patients_per_physician: 30
+  pairing_strategy: "optimal"  # optimal (Hungarian) | greedy
+
+  caliper:
+    enabled: true
+    percentile: 25.0
+
+  fixed_effects:
+    - "age"
+    - "is_male"
+    - "is_smoker"
+    - "ldl_cholesterol"
+    - "non_hdl_cholesterol"
+    - "hdl_cholesterol"
+    - "systolic_blood_pressure"
+    - "biomarker_hba1c_ngsp_blood"
+    - "estimated_glomerular_filtration_rate"
+
+  lpa_enabled: true
+  lpa_n_components_min: 2
+  lpa_n_components_max: 10
+  lpa_covariance_type: "full"
+  lpa_random_state: 42
+  lpa_n_init: 10
+  lpa_robust_scaling: true
+  lpa_distance_metric: "hybrid"  # euclidean_proba | hybrid
+  lpa_hybrid_alpha: 0.5
+  lpa_pairing_strategy: "optimal"
+
+  dataset_targets:
+    score2_five_groups_heter_patients:
+      expected_summary: >-
+        SCORE2-style: 20 physicians. Group 1: 100% if moderate+ else 0%;
+        group 2: 90% if moderate+ and 5% otherwise; group 3: 80% if moderate+
+        and 10% otherwise; group 4: 70% if moderate+ and 20% otherwise;
+        group 5: 50% regardless of SCORE2 class.
