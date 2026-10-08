@@ -868,8 +868,17 @@ def calibrate_joint_thresholds(
     }
 
 
+def _five_group_size(n_professionals: int) -> int:
+    """Physicians per group of the five-group design (J must be a multiple of 5)."""
+    if n_professionals < 5 or n_professionals % 5:
+        raise ValueError(f"The five-group design needs a multiple of 5 physicians (got {n_professionals}).")
+    return n_professionals // 5
+
+
 def _build_group_probability_maps(professionals: list[str]) -> tuple[dict[str, float], dict[str, float]]:
-    group_boundaries = ((0, 4), (4, 8), (8, 12), (12, 16), (16, 20))
+    """Consecutive blocks of J/5 physicians form groups 1 to 5 (J = 20: P1-P4, ..., P17-P20)."""
+    g = _five_group_size(len(professionals))
+    group_boundaries = tuple((k * g, (k + 1) * g) for k in range(5))
     p_high: dict[str, float] = {}
     p_low: dict[str, float] = {}
     for group_index, (lo, hi) in enumerate(group_boundaries):
@@ -1179,11 +1188,7 @@ def generate_score2_five_groups_heter_patients(
             realistic right-skewed marginal.
     """
     _validate_counts(n_patients, expected_n_pros)
-    if expected_n_pros != 20:
-        raise ValueError(
-            "score2_five_groups_heter_patients requires expected_n_pros=20 to keep fixed groups P1..P20 (got %d)."
-            % expected_n_pros
-        )
+    _five_group_size(expected_n_pros)  # J = 20 in the main benchmark; multiples of 5 in the grid
     n_patients = _ensure_min_support(n_patients, expected_n_pros, logger)
     df, professionals = _build_universal_base_cohort(
         n_patients, expected_n_pros, random_state,
@@ -1196,14 +1201,7 @@ def generate_score2_five_groups_heter_patients(
     )
     score2_indication = _calculate_score2_moderate_or_high_vectorized(df).to_numpy(dtype=bool)
 
-    group_boundaries = ((0, 4), (4, 8), (8, 12), (12, 16), (16, 20))
-    p_high: dict[str, float] = {}
-    p_low: dict[str, float] = {}
-    for group_index, (lo, hi) in enumerate(group_boundaries):
-        hi_p, lo_p = SCORE2_FIVE_CATEGORIES_CLUSTER_PROBS[group_index]
-        for pid in professionals[lo:hi]:
-            p_high[pid] = hi_p
-            p_low[pid] = lo_p
+    p_high, p_low = _build_group_probability_maps(professionals)
 
     rng = np.random.default_rng(random_state + 40)
     p_vec = np.where(
@@ -1539,7 +1537,8 @@ def five_group_physician_parameters(expected_n_pros: int = 20) -> dict[str, dict
     """Prescribing probabilities and group of each physician of the five-group design."""
     professionals = _professional_ids(expected_n_pros)
     p_high, p_low = _build_group_probability_maps(professionals)
-    group_of = {pid: 1 + i // 4 for i, pid in enumerate(professionals)}
+    g = _five_group_size(len(professionals))
+    group_of = {pid: 1 + i // g for i, pid in enumerate(professionals)}
     return {pid: {"p_high": p_high[pid], "p_low": p_low[pid], "group": group_of[pid]} for pid in professionals}
 
 

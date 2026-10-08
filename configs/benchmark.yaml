@@ -22,6 +22,20 @@ genetic:
   also_run_variants: ["legacy"]      # legacy variant reported for comparison only
   workers: -1                        # differential evolution workers (-1 = all cores)
 
+# GLMM specifications of Reviewer 2 comment 7 (oracle with the eligibility
+# indicator, pairwise interactions, natural splines) and a gradient-boosting
+# reference with a physician offset. Evaluated in_sample, and kfold where the
+# experiment includes it (SCORE2 and the cross-fitting subset).
+glmm_variants:
+  enabled: true
+
+# Calibration, residual and posterior predictive diagnostics of the baseline
+# GLMM (Reviewer 2 comments 8 and 9), stored in fitted_parameters/<id>.json.
+glmm_diagnostics:
+  enabled: true
+  families: [score2, progressive, sensitivity_independent, sensitivity_diabetes_hba1c]
+  n_boot: 2000                       # bootstrap of the calibration curve, CITL, slope and ICI
+
 # Per-method restrictions, mainly to bound the cost of genetic matching.
 method_rules:
   genetic_mahalanobis:
@@ -30,6 +44,14 @@ method_rules:
     designs_only_in_families:
       kfold: ["score2"]
       external: ["score2"]
+  glmm_oracle:
+    exclude_families: ["continuous", "latent", "sensitivity_independent", "sensitivity_diabetes_hba1c"]
+  glmm_interactions:
+    exclude_families: ["continuous", "latent", "sensitivity_independent", "sensitivity_diabetes_hba1c"]
+  glmm_splines:
+    exclude_families: ["continuous", "latent", "sensitivity_independent", "sensitivity_diabetes_hba1c"]
+  gbm_offset:
+    exclude_families: ["continuous", "latent", "sensitivity_independent", "sensitivity_diabetes_hba1c"]
   genetic_mahalanobis_legacy:
     exclude_designs: ["fold_restricted", "kfold", "lopo", "external", "oracle_eligible", "oracle_ineligible"]
     exclude_families: ["continuous", "progressive", "sensitivity_diabetes_hba1c", "latent"]   # weights cancel exactly; SCORE2 and D.1 suffice

@@ -1,0 +1,53 @@
+# Monte Carlo grids of the revision (src/benchmark/runner.py).
+#
+#   python -m src.benchmark.runner --config configs/grids.yaml --list
+#   python -m src.benchmark.runner --config configs/grids.yaml --smoke --workers 2
+#   python -m src.benchmark.runner --config configs/grids.yaml --workers 4    # resumable
+#
+# Each replicate is an independent cohort (its own seed): uncertainty is
+# reported as Monte Carlo variability (MCSE, 2.5 and 97.5 percentiles), not
+# as a bootstrap interval (Reviewer 2, comments 4 and 10). Only the fast
+# methods are run; Genetic Mahalanobis and LPA-guided are excluded for cost.
+# Runtimes measured with --workers > 1 are not comparable with the main run.
+
+run_id: "revision_grids"
+output_dir: "results"
+seed: 7000
+k_folds: 5
+caliper_percentile: 25.0
+threshold_strategy: "target_joint"
+covariate_model: "literature"
+hba1c_law: "lognormal"
+
+genetic:
+  enabled: false
+
+glmm_variants:
+  enabled: false
+
+glmm_diagnostics:
+  enabled: false
+
+families:
+  # R2 comment 4 (A5): rank discrimination as a function of panel size,
+  # continuous heterogeneity of physician consistency.
+  grid_panel:
+    enabled: true
+    seed: 7000
+    patients_per_physician: [50, 100, 200, 400, 800]
+    n_physicians: [20, 50, 100]
+    n_replicates: 50
+    designs: [in_sample, oracle_eligible]
+    methods: [euclidean, mahalanobis, learned_weights, mutual_information, rf_proximity, glmm]
+
+  # R2 comment 10 (A8): five-group SCORE2 over the cohort x panel grid of the
+  # first submission (Section 3.6, Appendix C), with independent cohorts per
+  # cell instead of B = 10 resamples of a single cohort.
+  grid_cohort_panel:
+    enabled: true
+    seed: 9000
+    n_patients: [5000, 10000, 20000, 30000]
+    n_physicians: [5, 10, 20, 50, 100]
+    n_replicates: 30
+    designs: [in_sample, oracle_eligible]
+    methods: [euclidean, mahalanobis, learned_weights, mutual_information, rf_proximity, glmm]

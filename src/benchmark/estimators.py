@@ -28,6 +28,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
+import os
+
 import numpy as np
 import pandas as pd
 from scipy.optimize import differential_evolution
@@ -68,6 +70,9 @@ class Cohort:
     y: np.ndarray
     physician: np.ndarray
     feature_names: list[str]
+    # True eligibility, used ONLY by explicitly oracle estimators (``oracle = True``),
+    # e.g. the GLMM with the eligibility indicator of Reviewer 2 comment 7.
+    eligible: Optional[np.ndarray] = None
 
     def __post_init__(self) -> None:
         self.X = np.asarray(self.X, dtype=float)
@@ -127,7 +132,7 @@ def _random_forest(n_train: int) -> RandomForestClassifier:
     return RandomForestClassifier(
         n_estimators=RF_N_ESTIMATORS,
         random_state=RANDOM_STATE,
-        n_jobs=-1,
+        n_jobs=int(os.environ.get("BENCHMARK_N_JOBS", "-1")),
         max_depth=RF_MAX_DEPTH,
         min_samples_leaf=max(5, int(0.01 * n_train)),
     )
@@ -480,6 +485,27 @@ def estimate_matching(
 # -----------------------------------------------------------------------------
 
 
+def _pearson_scores(cohort: Cohort, eval_idx: np.ndarray, p: np.ndarray,
+                    min_patients: int) -> list[PhysicianEstimate]:
+    """Per-physician mean squared Pearson residual on evaluation rows."""
+    p = np.clip(p, GLMM_EPSILON, 1 - GLMM_EPSILON)
+    y = cohort.y[eval_idx]
+    r2 = (y - p) ** 2 / np.clip(p * (1 - p), GLMM_EPSILON, None)
+    phys = cohort.physician[eval_idx]
+    empty_i, empty_f = np.empty(0, dtype=int), np.empty(0)
+    out: list[PhysicianEstimate] = []
+    for physician in np.unique(phys):
+        mask = phys == physician
+        if mask.sum() < min_patients:
+            continue
+        out.append(PhysicianEstimate(
+            physician=str(physician), score=float(np.mean(r2[mask])), n_candidates=int(mask.sum()),
+            n_pairs=0, n_patients_paired=0, caliper_threshold=float("nan"),
+            pair_index_a=empty_i, pair_index_b=empty_i, pair_distance=empty_f,
+        ))
+    return out
+
+
 class GLMMEstimator(Estimator):
     """Physician random-intercept logistic model; score = mean squared Pearson residual.
 
@@ -487,66 +513,187 @@ class GLMMEstimator(Estimator):
     random intercept of a physician absent from the training rows is set to 0.
     Continuous covariates are standardised on the evaluated cohort, as in the
     historical pipeline; binary covariates are kept as 0/1.
+
+    Variants of the mean structure (Reviewer 2 comment 7):
+
+    - ``baseline``: additive logit in the nine covariates (first submission);
+    - ``oracle``: baseline plus the true eligibility indicator. With the mean
+      structure correct by construction, the residual score isolates physician
+      inconsistency; this is an oracle analysis, not an available estimator;
+    - ``interactions``: baseline plus all pairwise interactions of the
+      covariates (the analyst does not know which covariates define the rule);
+    - ``splines``: natural cubic regression splines (4 df) for the continuous
+      covariates, which lets the model approximate thresholds.
     """
 
-    name = "glmm"
     supervised = True
     kind = "model"
+    VARIANTS = ("baseline", "oracle", "interactions", "splines")
 
-    def _design(self, cohort: Cohort) -> pd.DataFrame:
+    def __init__(self, variant: str = "baseline") -> None:
+        if variant not in self.VARIANTS:
+            raise ValueError(f"Unknown GLMM variant {variant!r}.")
+        self.variant = variant
+        self.oracle = variant == "oracle"
+        self.name = "glmm" if variant == "baseline" else f"glmm_{variant}"
+
+    def _frame(self, cohort: Cohort) -> pd.DataFrame:
         df = pd.DataFrame(cohort.X, columns=cohort.feature_names)
         cont = [c for c in cohort.feature_names if df[c].nunique() > 2]
         if cont:
             df[cont] = StandardScaler().fit_transform(df[cont])
-        df["_y"] = cohort.y
-        df["_phys"] = cohort.physician
+        if self.oracle:
+            if cohort.eligible is None:
+                raise ValueError("The oracle GLMM requires cohort.eligible.")
+            df["eligible"] = np.asarray(cohort.eligible, dtype=float)
+        self._continuous = cont
         return df
 
+    def _formula(self, features: list[str]) -> str:
+        if self.variant == "baseline":
+            return " + ".join(features)
+        if self.variant == "oracle":
+            return " + ".join(features + ["eligible"])
+        if self.variant == "interactions":
+            return "(" + " + ".join(features) + ")**2"
+        terms = [f"cr({c}, df=4)" if c in self._continuous else c for c in features]
+        return " + ".join(terms)
+
     def fit(self, cohort: Cohort, fit_idx: np.ndarray) -> "GLMMEstimator":
-        df = self._design(cohort).iloc[np.asarray(fit_idx, dtype=int)].reset_index(drop=True)
-        model, result = _fit_binomial_bayes_mixed_glmm(df, "_y", "_phys", list(cohort.feature_names))
-        names = list(model.fep_names)
-        fe = np.asarray(result.fe_mean, dtype=float)
-        self.intercept_ = float(fe[names.index("Intercept")]) if "Intercept" in names else 0.0
-        self.coef_ = np.array([fe[names.index(c)] for c in cohort.feature_names])
-        self.random_effects_ = {}
-        for vc_name, value in zip(model.vc_names, np.asarray(result.vc_mean, dtype=float)):
-            label = str(vc_name)
-            if "[" in label and "]" in label:
-                label = label.split("[")[-1].split("]")[0]
-            if label.startswith("T."):
-                label = label[2:]
-            self.random_effects_[label] = float(value)
-        missing = set(np.unique(df["_phys"])) - set(self.random_effects_)
+        fit_idx = np.asarray(fit_idx, dtype=int)
+        frame = self._frame(cohort)
+        features = list(cohort.feature_names)
+        if self.variant == "baseline":
+            df = frame.iloc[fit_idx].reset_index(drop=True)
+            df["_y"], df["_phys"] = cohort.y[fit_idx], cohort.physician[fit_idx]
+            model, result = _fit_binomial_bayes_mixed_glmm(df, "_y", "_phys", features)
+            names = list(model.fep_names)
+            fe = np.asarray(result.fe_mean, dtype=float)
+            self._design_info = None
+            self.coef_ = np.array([fe[names.index("Intercept")]] + [fe[names.index(c)] for c in features])
+            self.coef_sd_ = np.array([result.fe_sd[names.index("Intercept")]] +
+                                     [result.fe_sd[names.index(c)] for c in features])
+            labels = [self._clean_label(v) for v in model.vc_names]
+        else:
+            import patsy
+            from statsmodels.genmod.bayes_mixed_glm import BinomialBayesMixedGLM
+
+            train = frame.iloc[fit_idx]
+            # Natural-spline knots are set on the training rows; evaluated rows
+            # outside that range are clipped to it (patsy cr cannot extrapolate).
+            self._bounds = {c: (float(train[c].min()), float(train[c].max())) for c in self._continuous}
+            design = patsy.dmatrix(self._formula(features), train, return_type="dataframe")
+            self._design_info = design.design_info
+            dummies = pd.get_dummies(pd.Series(cohort.physician[fit_idx]), drop_first=False)
+            model = BinomialBayesMixedGLM(
+                cohort.y[fit_idx], design.to_numpy(dtype=float), dummies.to_numpy(dtype=float),
+                np.zeros(dummies.shape[1], dtype=int), fep_names=list(design.columns),
+                vc_names=[str(c) for c in dummies.columns],
+            )
+            result = model.fit_vb()
+            self.coef_ = np.asarray(result.fe_mean, dtype=float)
+            self.coef_sd_ = np.asarray(result.fe_sd, dtype=float)
+            labels = [str(c) for c in dummies.columns]
+        self.random_effects_ = dict(zip(labels, np.asarray(result.vc_mean, dtype=float)))
+        self.random_effects_sd_ = dict(zip(labels, np.asarray(result.vc_sd, dtype=float)))
+        missing = set(np.unique(cohort.physician[fit_idx])) - set(self.random_effects_)
         if missing:
             raise RuntimeError(f"GLMM random effects not mapped for physicians: {sorted(missing)[:5]}")
         return self
 
+    @staticmethod
+    def _clean_label(vc_name: object) -> str:
+        label = str(vc_name)
+        if "[" in label and "]" in label:
+            label = label.split("[")[-1].split("]")[0]
+        return label[2:] if label.startswith("T.") else label
+
     def prepare(self, cohort: Cohort) -> None:
-        self._df = self._design(cohort)
-        self._features = list(cohort.feature_names)
+        frame = self._frame(cohort)
+        if self._design_info is None:
+            self._exog = np.column_stack([np.ones(cohort.n), frame[list(cohort.feature_names)].to_numpy(dtype=float)])
+        else:
+            import patsy
+
+            if self.variant == "splines":
+                for c, (lo, hi) in self._bounds.items():
+                    frame[c] = frame[c].clip(lo, hi)
+            (design,) = patsy.build_design_matrices([self._design_info], frame, return_type="matrix")
+            self._exog = np.asarray(design, dtype=float)
+        self._u = np.array([self.random_effects_.get(p, 0.0) for p in cohort.physician])
+
+    def linear_predictor(self, eval_idx: np.ndarray, include_random_effect: bool = True) -> np.ndarray:
+        eval_idx = np.asarray(eval_idx, dtype=int)
+        lin = self._exog[eval_idx] @ self.coef_
+        return lin + self._u[eval_idx] if include_random_effect else lin
+
+    def predict_proba(self, eval_idx: np.ndarray) -> np.ndarray:
+        return 1.0 / (1.0 + np.exp(-self.linear_predictor(eval_idx)))
+
+    def estimate(self, cohort: Cohort, eval_idx: np.ndarray,
+                 min_patients: int = MIN_PATIENTS_PER_PHYSICIAN) -> list[PhysicianEstimate]:
+        return _pearson_scores(cohort, np.asarray(eval_idx, dtype=int), self.predict_proba(eval_idx), min_patients)
+
+    def fitted_parameters(self) -> dict[str, Any]:
+        return {"variant": self.variant, "n_fixed_effects": int(len(self.coef_)),
+                "random_effect_sd_mean": float(np.mean(list(self.random_effects_sd_.values())))}
+
+
+class GradientBoostingOffsetEstimator(Estimator):
+    """Flexible reference for the GLMM score (Reviewer 2 comment 7).
+
+    A gradient-boosted classifier learns the outcome from the covariates (no
+    physician information); a physician intercept is then estimated on the
+    logit scale with the boosted predictions as offset (Newton steps with a
+    N(0, 1) ridge penalty, which plays the role of the random-effect prior).
+    The score is the per-physician mean squared Pearson residual.
+    """
+
+    name = "gbm_offset"
+    supervised = True
+    kind = "model"
+
+    def fit(self, cohort: Cohort, fit_idx: np.ndarray) -> "GradientBoostingOffsetEstimator":
+        from sklearn.ensemble import HistGradientBoostingClassifier
+
+        fit_idx = np.asarray(fit_idx, dtype=int)
+        self._gbm = HistGradientBoostingClassifier(
+            max_iter=300, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=max(20, int(0.005 * len(fit_idx))),
+            early_stopping=True, validation_fraction=0.1, random_state=RANDOM_STATE,
+        ).fit(cohort.X[fit_idx], cohort.y[fit_idx])
+        f = self._logit(fit_idx, cohort)
+        y, phys = cohort.y[fit_idx], cohort.physician[fit_idx]
+        self.offsets_: dict[str, float] = {}
+        for p in np.unique(phys):
+            m = phys == p
+            u = 0.0
+            for _ in range(50):
+                mu = 1.0 / (1.0 + np.exp(-(f[m] + u)))
+                grad = np.sum(y[m] - mu) - u
+                hess = np.sum(mu * (1 - mu)) + 1.0
+                step = grad / hess
+                u += step
+                if abs(step) < 1e-8:
+                    break
+            self.offsets_[str(p)] = float(u)
+        return self
+
+    def _logit(self, idx: np.ndarray, cohort: Cohort) -> np.ndarray:
+        p = np.clip(self._gbm.predict_proba(cohort.X[idx])[:, 1], 1e-6, 1 - 1e-6)
+        return np.log(p / (1 - p))
+
+    def prepare(self, cohort: Cohort) -> None:
+        self._cohort = cohort
 
     def estimate(self, cohort: Cohort, eval_idx: np.ndarray,
                  min_patients: int = MIN_PATIENTS_PER_PHYSICIAN) -> list[PhysicianEstimate]:
         eval_idx = np.asarray(eval_idx, dtype=int)
-        df = self._df.iloc[eval_idx]
-        lin = self.intercept_ + df[self._features].to_numpy(dtype=float) @ self.coef_
-        u = df["_phys"].map(self.random_effects_).fillna(0.0).to_numpy(dtype=float)
-        p = np.clip(1.0 / (1.0 + np.exp(-(lin + u))), GLMM_EPSILON, 1 - GLMM_EPSILON)
-        r2 = (df["_y"].to_numpy() - p) ** 2 / np.clip(p * (1 - p), GLMM_EPSILON, None)
-        out: list[PhysicianEstimate] = []
-        phys = df["_phys"].to_numpy()
-        empty_i, empty_f = np.empty(0, dtype=int), np.empty(0)
-        for physician in np.unique(phys):
-            mask = phys == physician
-            if mask.sum() < min_patients:
-                continue
-            out.append(PhysicianEstimate(
-                physician=str(physician), score=float(np.mean(r2[mask])), n_candidates=int(mask.sum()),
-                n_pairs=0, n_patients_paired=0, caliper_threshold=float("nan"),
-                pair_index_a=empty_i, pair_index_b=empty_i, pair_distance=empty_f,
-            ))
-        return out
+        u = np.array([self.offsets_.get(p, 0.0) for p in cohort.physician[eval_idx]])
+        p = 1.0 / (1.0 + np.exp(-(self._logit(eval_idx, cohort) + u)))
+        return _pearson_scores(cohort, eval_idx, p, min_patients)
+
+    def fitted_parameters(self) -> dict[str, Any]:
+        return {"n_iter": int(self._gbm.n_iter_)}
 
 
 # -----------------------------------------------------------------------------
@@ -555,7 +702,7 @@ class GLMMEstimator(Estimator):
 
 
 def build_estimators(genetic_variant: str = "genmatch", include_genetic: bool = True,
-                     genetic_workers: int = -1) -> list[Estimator]:
+                     genetic_workers: int = -1, include_glmm_variants: bool = False) -> list[Estimator]:
     """Instantiate the benchmark methods in their canonical order."""
     methods: list[Estimator] = [
         EuclideanEstimator(),
@@ -568,4 +715,7 @@ def build_estimators(genetic_variant: str = "genmatch", include_genetic: bool = 
     if include_genetic:
         methods.append(GeneticMahalanobisEstimator(variant=genetic_variant, workers=genetic_workers))
     methods.append(GLMMEstimator())
+    if include_glmm_variants:
+        methods += [GLMMEstimator(v) for v in ("oracle", "interactions", "splines")]
+        methods.append(GradientBoostingOffsetEstimator())
     return methods

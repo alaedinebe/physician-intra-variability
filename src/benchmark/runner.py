@@ -12,6 +12,17 @@ an interrupted run resumes where it stopped: experiments whose shard exists
 are skipped. ``--merge`` concatenates the shards into
 ``<output_dir>/benchmark_long.csv.gz``.
 
+Provenance. Each launch has a UTC timestamp identifier (``launch_id``) and a
+code fingerprint (SHA-256 of every ``src/**/*.py`` file and of the resolved
+configuration). Both are written in every row of the output table, in
+``fitted_parameters/<experiment_id>.json`` with the start and end times of
+the experiment, and in ``manifests/<launch_id>.json`` (``manifest.json`` is a
+copy of the latest one). A shard is reused only if its fingerprint equals the
+current one: if the code or the configuration changed since it was written,
+the launch stops and lists the stale experiments (``--allow-stale`` keeps
+them, ``--rerun-stale`` recomputes them). A lock file prevents two launches
+from writing to the same run directory at the same time.
+
 One row of the output table is one (experiment, method, design, physician).
 The columns are documented in ``OUTPUT_COLUMNS``.
 """
@@ -77,7 +88,9 @@ FEATURES = [
 ]
 OUTCOME_COL, PHYSICIAN_COL = "recommendation", "professional_id"
 DEVELOPMENT_SEED_OFFSET = 500_000
-SCORE2_FAMILIES = frozenset({"score2", "sensitivity_independent", "sensitivity_diabetes_hba1c"})
+SCORE2_FAMILIES = frozenset({"score2", "sensitivity_independent", "sensitivity_diabetes_hba1c",
+                             "grid_cohort_panel"})
+CONTINUOUS_FAMILIES = frozenset({"continuous", "grid_panel"})
 FOLD_SEED_OFFSET = 7_919
 
 OUTPUT_COLUMNS = {
@@ -144,6 +157,9 @@ OUTPUT_COLUMNS = {
     "estimate_seconds": "Wall-clock time of distance computation, pairing and scoring for this design.",
     "n_fits": "Number of fits performed for this design.",
     "fit_reused": "Whether the full-data fit of in_sample was reused.",
+    # provenance
+    "launch_id": "UTC timestamp of the launch that computed the experiment (YYYYmmddTHHMMSSZ).",
+    "code_fingerprint": "SHA-256 (12 hex) of src/**/*.py and of the resolved configuration.",
 }
 
 
@@ -209,7 +225,7 @@ def generate_experiment(spec: ExperimentSpec, threshold_strategy: str) -> Genera
         )
         eligible = df["generation_rule_mask"].to_numpy(dtype=bool)
         meta = {"rule_type": "score2", "variables": []}
-    elif spec.family == "continuous":
+    elif spec.family in CONTINUOUS_FAMILIES:
         df, raw_params, _ = generate_score2_continuous_heterogeneity(
             n_patients=spec.n_patients, expected_n_pros=spec.n_physicians, random_state=spec.seed,
             pairwise_correlation=spec.covariate_correlation, hba1c_law=spec.hba1c_law,
@@ -332,6 +348,27 @@ def build_plan(cfg: dict[str, Any]) -> list[ExperimentSpec]:
                                         int(b["n_patients"]), int(b["n_physicians"]), replicate=r,
                                         hba1c_law=default_hba1c, covariate_model=default_model,
                                         designs=designs, methods=b.get("methods")))
+    # Monte Carlo grids (R2 comments 4 and 10): independent cohorts per cell.
+    # grid_panel: continuous heterogeneity, patients per physician x physicians.
+    # grid_cohort_panel: five-group SCORE2, cohort size x physicians (replaces
+    # the B = 10 resamples of one cohort per cell of the first submission).
+    for name, size_key, tag in (("grid_panel", "patients_per_physician", "m"),
+                                ("grid_cohort_panel", "n_patients", "n")):
+        b = fam.get(name, {})
+        if not b.get("enabled", False):
+            continue
+        seed0 = int(b.get("seed", base_seed))
+        cell = 0
+        for size in b[size_key]:
+            for J in b["n_physicians"]:
+                n = int(size) * int(J) if size_key == "patients_per_physician" else int(size)
+                for r in range(int(b["n_replicates"])):
+                    specs.append(ExperimentSpec(
+                        f"{name}_{tag}{int(size)}_J{int(J)}_r{r:03d}", name, seed0 + 10_000 * cell + r,
+                        n, int(J), replicate=r, hba1c_law=default_hba1c, covariate_model=default_model,
+                        designs=_designs(b), methods=b.get("methods")))
+                cell += 1
+
     ids = [s.experiment_id for s in specs]
     if len(ids) != len(set(ids)):
         raise ValueError("Duplicate experiment identifiers in the plan.")
@@ -430,6 +467,7 @@ def run_experiment(exp: GeneratedExperiment, estimators: list[Estimator], cfg: d
     """Run every (method, design) of one experiment; return its rows and fitted parameters."""
     spec = exp.spec
     cohort = Cohort.from_frame(exp.df, FEATURES, OUTCOME_COL, PHYSICIAN_COL)
+    cohort.eligible = exp.eligible  # read only by explicitly oracle estimators (glmm_oracle)
     folds = stratified_folds(cohort.physician, int(cfg.get("k_folds", DEFAULT_K)),
                              seed=spec.seed + FOLD_SEED_OFFSET + 13 * int(spec.plan_index or 0))
     sd = np.std(cohort.X, axis=0)
@@ -488,6 +526,15 @@ def run_experiment(exp: GeneratedExperiment, estimators: list[Estimator], cfg: d
                 if target == "in_sample" and res.fitted is not None:
                     prefitted = res.fitted
                     fitted_params[est.name] = res.fitted.fitted_parameters()
+                    diag_cfg = cfg.get("glmm_diagnostics") or {}
+                    if (est.name == "glmm" and diag_cfg.get("enabled", False)
+                            and spec.family in (diag_cfg.get("families") or [])):
+                        from src.benchmark.glmm_diagnostics import glmm_diagnostics
+                        t1 = time.perf_counter()
+                        fitted_params["glmm_diagnostics"] = glmm_diagnostics(
+                            res.fitted, cohort, truth["D_star"].to_dict(), seed=spec.seed,
+                            n_boot=int(diag_cfg.get("n_boot", 2000)))
+                        LOGGER.info("  %-28s %-18s %6.1fs", "glmm_diagnostics", target, time.perf_counter() - t1)
             _emit(computed[target], design, target, None if est.kind == "model" else caliper)
 
         # Caliper sensitivity: same fit, alternative calipers (matching methods only).
@@ -506,6 +553,9 @@ def run_experiment(exp: GeneratedExperiment, estimators: list[Estimator], cfg: d
                                 time.perf_counter() - t0, "none" if alt >= 100 else f"{alt:g}")
                     _emit(res, design, target, alt)
     table = pd.DataFrame(rows)
+    prov = cfg.get("_provenance") or {}
+    table["launch_id"] = prov.get("launch_id")
+    table["code_fingerprint"] = prov.get("code_fingerprint")
     missing = [c for c in OUTPUT_COLUMNS if c not in table.columns]
     if missing and len(table):
         raise RuntimeError(f"Output columns missing: {missing}")
@@ -532,9 +582,74 @@ def _git_dirty() -> Optional[bool]:
         return None
 
 
-def write_manifest(out_dir: Path, cfg: dict[str, Any], plan: list[ExperimentSpec]) -> None:
+REPO_ROOT = Path(__file__).resolve().parents[2]
+# Post-processing modules that do not change any shard.
+FINGERPRINT_EXCLUDED = frozenset({"metrics.py"})
+
+
+def code_fingerprint(cfg: dict[str, Any]) -> str:
+    """SHA-256 (12 hex) of the source files and of the resolved configuration."""
+    import hashlib
+
+    h = hashlib.sha256()
+    for path in sorted((REPO_ROOT / "src").rglob("*.py")):
+        if "__pycache__" in path.parts or path.name in FINGERPRINT_EXCLUDED:
+            continue
+        h.update(path.relative_to(REPO_ROOT).as_posix().encode())
+        h.update(path.read_bytes())
+    clean = {k: v for k, v in cfg.items() if not k.startswith("_")}
+    h.update(json.dumps(clean, sort_keys=True, default=str).encode())
+    return h.hexdigest()[:12]
+
+
+def shard_fingerprint(out_dir: Path, experiment_id: str) -> Optional[str]:
+    path = out_dir / "fitted_parameters" / f"{experiment_id}.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("provenance", {}).get("code_fingerprint")
+    except Exception:
+        return None
+
+
+class RunLock:
+    """Exclusive lock on a run directory (stale locks of dead processes are taken over)."""
+
+    def __init__(self, out_dir: Path, suffix: str = "") -> None:
+        self.path = out_dir / f"run.lock{suffix}"
+
+    def __enter__(self) -> "RunLock":
+        if self.path.exists():
+            try:
+                pid = int(json.loads(self.path.read_text())["pid"])
+                os.kill(pid, 0)
+                alive = True
+            except (ProcessLookupError, ValueError, KeyError, json.JSONDecodeError):
+                alive = False
+            except PermissionError:
+                alive = True
+            if alive:
+                raise RuntimeError(f"{self.path} is held by a running process (pid {pid}); "
+                                   "another launch is writing to this run directory.")
+            LOGGER.warning("Stale lock %s removed.", self.path)
+            self.path.unlink()
+        fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        with os.fdopen(fd, "w") as fh:
+            json.dump({"pid": os.getpid(), "started_utc": datetime.now(timezone.utc).isoformat()}, fh)
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        try:
+            self.path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def write_manifest(out_dir: Path, cfg: dict[str, Any], plan: list[ExperimentSpec],
+                   extra: Optional[dict[str, Any]] = None) -> None:
     import numpy, pandas, scipy, sklearn, statsmodels  # noqa: E401
+    prov = cfg.get("_provenance") or {}
     manifest = {
+        "launch_id": prov.get("launch_id"),
+        "code_fingerprint": prov.get("code_fingerprint"),
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "git_commit": _git_commit(),
         "git_uncommitted_changes": _git_dirty(),
@@ -544,13 +659,16 @@ def write_manifest(out_dir: Path, cfg: dict[str, Any], plan: list[ExperimentSpec
         "processor": platform.processor(),
         "cpu_count": os.cpu_count(),
         "libraries": {m.__name__: m.__version__ for m in (numpy, pandas, scipy, sklearn, statsmodels)},
-        "config": cfg,
+        "config": {k: v for k, v in cfg.items() if not k.startswith("_")},
         "n_experiments": len(plan),
         "experiments": [{"experiment_id": s.experiment_id, "family": s.family, "designs": s.designs} for s in plan],
         "columns": OUTPUT_COLUMNS,
+        **(extra or {}),
     }
-    with (out_dir / "manifest.json").open("w", encoding="utf-8") as fh:
-        json.dump(manifest, fh, indent=2, default=str)
+    (out_dir / "manifests").mkdir(parents=True, exist_ok=True)
+    text = json.dumps(manifest, indent=2, default=str)
+    (out_dir / "manifests" / f"{prov.get('launch_id', 'unknown')}.json").write_text(text, encoding="utf-8")
+    (out_dir / "manifest.json").write_text(text, encoding="utf-8")
 
 
 def merge_shards(out_dir: Path) -> Path:
@@ -558,6 +676,10 @@ def merge_shards(out_dir: Path) -> Path:
     if not shards:
         raise FileNotFoundError(f"No shard in {out_dir / 'shards'}.")
     table = pd.concat((pd.read_csv(p) for p in shards), ignore_index=True)
+    if "code_fingerprint" in table.columns:
+        fps = table.groupby("code_fingerprint", dropna=False)["experiment_id"].nunique()
+        if len(fps) > 1:
+            LOGGER.warning("Shards come from %d code fingerprints: %s", len(fps), fps.to_dict())
     path = out_dir / "benchmark_long.csv.gz"
     table.to_csv(path, index=False)
     LOGGER.info("Merged %d shards, %d rows -> %s", len(shards), len(table), path)
@@ -570,11 +692,17 @@ def apply_smoke(cfg: dict[str, Any]) -> dict[str, Any]:
     cfg["run_id"] = f"{cfg.get('run_id', 'run')}_smoke"
     cfg["genetic"] = dict(cfg.get("genetic", {}), enabled=False)
     for name, block in cfg["families"].items():
+        if name == "grid_panel":
+            block.update(patients_per_physician=[50, 100], n_physicians=[20], n_replicates=1)
+            continue
+        if name == "grid_cohort_panel":
+            block.update(n_patients=[1_000, 2_000], n_physicians=[5, 20], n_replicates=1)
+            continue
         block["n_patients"] = min(int(block["n_patients"]), 2_000 if name != "continuous" else 2_500)
         if name == "continuous":
             block["n_replicates"] = min(int(block.get("n_replicates", 1)), 1)
     if "progressive" in cfg["families"]:
-        cfg["families"]["progressive"]["max_experiments"] = 4
+        cfg["families"]["progressive"]["max_experiments"] = int(cfg["families"]["progressive"].get("max_experiments", 4))
     return cfg
 
 
@@ -585,9 +713,19 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--smoke", action="store_true", help="Small cohorts, no genetic matching, few experiments.")
     parser.add_argument("--merge", action="store_true", help="Merge existing shards and exit.")
     parser.add_argument("--list", action="store_true", help="Print the plan and exit.")
+    stale = parser.add_mutually_exclusive_group()
+    stale.add_argument("--allow-stale", action="store_true",
+                       help="Keep shards computed with another code fingerprint (not recommended).")
+    stale.add_argument("--rerun-stale", action="store_true",
+                       help="Recompute shards computed with another code fingerprint.")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="Run the plan in this many parallel processes (experiments split between them).")
+    parser.add_argument("--worker-index", type=int, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--launch-id", type=str, default=None, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    tag = "" if args.worker_index is None else f"[w{args.worker_index}] "
+    logging.basicConfig(level=logging.INFO, format=f"%(asctime)s %(levelname)s {tag}%(message)s")
     warnings.filterwarnings("ignore", category=UserWarning)
     warnings.filterwarnings("ignore", category=RuntimeWarning)
     cfg = yaml.safe_load(args.config.read_text(encoding="utf-8"))
@@ -618,13 +756,89 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"{len(plan)} experiments")
         return 0
 
+    launch_id = args.launch_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    fingerprint = code_fingerprint(cfg)
+    cfg["_provenance"] = {"launch_id": launch_id, "code_fingerprint": fingerprint}
     (out_dir / "shards").mkdir(parents=True, exist_ok=True)
     (out_dir / "fitted_parameters").mkdir(parents=True, exist_ok=True)
-    write_manifest(out_dir, cfg, plan)
+    LOGGER.info("Launch %s, code fingerprint %s, output %s", launch_id, fingerprint, out_dir)
+
+    stale_ids = [s.experiment_id for s in plan
+                 if (out_dir / "shards" / f"{s.experiment_id}.csv.gz").exists()
+                 and shard_fingerprint(out_dir, s.experiment_id) != fingerprint]
+    if stale_ids and not (args.allow_stale or args.rerun_stale):
+        LOGGER.error("%d existing shard(s) were computed with another code or configuration: %s. "
+                     "Delete them, or relaunch with --rerun-stale (recompute) or --allow-stale (keep).",
+                     len(stale_ids), ", ".join(stale_ids[:10]) + (" ..." if len(stale_ids) > 10 else ""))
+        return 2
+    if stale_ids:
+        LOGGER.warning("%d stale shard(s) %s.", len(stale_ids), "will be recomputed" if args.rerun_stale else "kept")
+
+    rerun = stale_ids if args.rerun_stale else []
+    if args.worker_index is not None:
+        with RunLock(out_dir, suffix=f".w{args.worker_index}"):
+            return _run_plan(plan, cfg, out_dir, run_id, rerun, merge=False)
+    with RunLock(out_dir):
+        write_manifest(out_dir, cfg, plan, extra={"stale_shards": stale_ids,
+                                                  "stale_policy": "rerun" if args.rerun_stale else
+                                                  ("keep" if args.allow_stale else "none"),
+                                                  "workers": args.workers})
+        if args.workers <= 1:
+            return _run_plan(plan, cfg, out_dir, run_id, rerun)
+        return _run_parallel(args, plan, out_dir, launch_id)
+
+
+def _run_parallel(args: argparse.Namespace, plan: list[ExperimentSpec], out_dir: Path, launch_id: str) -> int:
+    """Split the plan between worker processes (largest cohorts first, round robin) and merge at the end.
+
+    Each worker gets an equal share of the cores for its BLAS/OpenMP threads and
+    for the random forest (``BENCHMARK_N_JOBS``). Runtimes measured in parallel
+    mode are therefore not comparable with those of the main run.
+    """
+    n_workers = int(args.workers)
+    order = sorted(range(len(plan)), key=lambda i: -plan[i].n_patients)
+    parts: list[list[str]] = [[] for _ in range(n_workers)]
+    for rank, i in enumerate(order):
+        parts[rank % n_workers].append(plan[i].experiment_id)
+    threads = max(1, (os.cpu_count() or n_workers) // n_workers)
+    env = dict(os.environ, BENCHMARK_N_JOBS=str(threads), OMP_NUM_THREADS=str(threads),
+               OPENBLAS_NUM_THREADS=str(threads), MKL_NUM_THREADS=str(threads),
+               VECLIB_MAXIMUM_THREADS=str(threads))
+    (out_dir / "logs").mkdir(exist_ok=True)
+    procs = []
+    for k, ids in enumerate(parts):
+        if not ids:
+            continue
+        cmd = [sys.executable, "-m", "src.benchmark.runner", "--config", str(args.config),
+               "--worker-index", str(k), "--launch-id", launch_id, "--only", *ids]
+        if args.smoke:
+            cmd.append("--smoke")
+        if args.rerun_stale:
+            cmd.append("--rerun-stale")
+        if args.allow_stale:
+            cmd.append("--allow-stale")
+        log = (out_dir / "logs" / f"{launch_id}_w{k}.log").open("w", encoding="utf-8")
+        procs.append((k, subprocess.Popen(cmd, env=env, stdout=log, stderr=subprocess.STDOUT), log))
+        LOGGER.info("Worker %d: %d experiments, %d threads, log %s", k, len(ids), threads, log.name)
+    failed = []
+    for k, proc, log in procs:
+        if proc.wait() != 0:
+            failed.append(k)
+        log.close()
+    if failed:
+        LOGGER.error("Workers %s failed; see %s. Relaunch the same command to resume.", failed, out_dir / "logs")
+        return 1
+    merge_shards(out_dir)
+    return 0
+
+
+def _run_plan(plan: list[ExperimentSpec], cfg: dict[str, Any], out_dir: Path, run_id: str,
+              rerun: list[str], merge: bool = True) -> int:
     g = cfg.get("genetic", {})
     estimators = build_estimators(genetic_variant=str(g.get("variant", "genmatch")),
                                   include_genetic=bool(g.get("enabled", True)),
-                                  genetic_workers=int(g.get("workers", -1)))
+                                  genetic_workers=int(g.get("workers", -1)),
+                                  include_glmm_variants=bool((cfg.get("glmm_variants") or {}).get("enabled", False)))
     if "legacy" in (g.get("also_run_variants") or []) and g.get("enabled", True):
         from src.benchmark.estimators import GeneticMahalanobisEstimator
         estimators.insert(-1, GeneticMahalanobisEstimator(variant="legacy", workers=int(g.get("workers", -1))))
@@ -633,21 +847,27 @@ def main(argv: Optional[list[str]] = None) -> int:
     t_run = time.perf_counter()
     for i, spec in enumerate(plan, start=1):
         shard = out_dir / "shards" / f"{spec.experiment_id}.csv.gz"
-        if shard.exists():
+        if shard.exists() and spec.experiment_id not in rerun:
             LOGGER.info("[%d/%d] %s already done, skipped.", i, len(plan), spec.experiment_id)
             continue
         LOGGER.info("[%d/%d] %s (%s)", i, len(plan), spec.experiment_id, spec.family)
         t0 = time.perf_counter()
+        started = datetime.now(timezone.utc).isoformat()
         exp = generate_experiment(spec, threshold_strategy)
         table, fitted = run_experiment(exp, estimators, cfg, run_id)
         tmp = shard.with_suffix(".tmp")
         table.to_csv(tmp, index=False, compression="gzip")
         tmp.replace(shard)
         with (out_dir / "fitted_parameters" / f"{spec.experiment_id}.json").open("w", encoding="utf-8") as fh:
-            json.dump({"metadata": exp.metadata, "fitted": fitted}, fh, indent=1, default=str)
+            json.dump({"provenance": dict(cfg["_provenance"], experiment_id=spec.experiment_id,
+                                          started_utc=started,
+                                          finished_utc=datetime.now(timezone.utc).isoformat(),
+                                          git_commit=_git_commit()),
+                       "metadata": exp.metadata, "fitted": fitted}, fh, indent=1, default=str)
         LOGGER.info("[%d/%d] %s done in %.0fs (%d rows).", i, len(plan), spec.experiment_id,
                     time.perf_counter() - t0, len(table))
-    merge_shards(out_dir)
+    if merge:
+        merge_shards(out_dir)
     LOGGER.info("Run finished in %.1f min.", (time.perf_counter() - t_run) / 60)
     return 0
 
