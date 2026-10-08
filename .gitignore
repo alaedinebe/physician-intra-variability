@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Benchmark outputs (large; archived separately with a persistent identifier)
+results/
+experiments/
+
+# OS
+.DS_Store

@@ -33,11 +33,31 @@ PROGRESSIVE_RULE_DEFAULT_N_PASSES = 2
 #              Uniform(target_eligibility_low, target_eligibility_high).
 #              This guarantees E[P(eligible)] = p_star regardless of window
 #              size, eliminating the structural drop of long-window experiments.
+#              Only valid when every covariate in the window is continuous: the
+#              quantile of a binary covariate is 0 or 1, so the realised
+#              eligibility departs from p_star (up to 100% eligible).
+# - "target_joint": calibrates the thresholds on the realised joint
+#              eligibility of the cohort. Binary covariates are always active
+#              (condition x <= 0, i.e. reference level). A single per-variable
+#              quantile q, shared by the continuous covariates and capped at
+#              JOINT_CALIBRATION_Q_MAX so that every continuous covariate
+#              restricts eligibility, is found by bisection so that the
+#              empirical joint eligibility is as close as possible to p_star.
+#              When p_star is not attainable (e.g. binary-only windows), the
+#              closest attainable value is used and the shortfall is recorded.
 THRESHOLD_STRATEGY_UNIFORM = "uniform"
 THRESHOLD_STRATEGY_TARGET_QUANTILE = "target_quantile"
-THRESHOLD_STRATEGY_DEFAULT = THRESHOLD_STRATEGY_UNIFORM
+THRESHOLD_STRATEGY_TARGET_JOINT = "target_joint"
+THRESHOLD_STRATEGIES = (
+    THRESHOLD_STRATEGY_UNIFORM,
+    THRESHOLD_STRATEGY_TARGET_QUANTILE,
+    THRESHOLD_STRATEGY_TARGET_JOINT,
+)
+THRESHOLD_STRATEGY_DEFAULT = THRESHOLD_STRATEGY_TARGET_JOINT
 TARGET_ELIGIBILITY_DEFAULT_LOW = 0.2
 TARGET_ELIGIBILITY_DEFAULT_HIGH = 0.8
+JOINT_CALIBRATION_Q_MAX = 0.95
+JOINT_CALIBRATION_N_ITER = 60
 
 # Minimum support required per physician at generation time.
 MIN_PATIENTS_PER_PHYSICIAN_BASE = 90
@@ -87,6 +107,98 @@ DBP_MEAN, DBP_STD, DBP_MIN, DBP_MAX = 82.0, 11.0, 60, 115
 HAD_MEAN_A, HAD_MEAN_B, HAD_COMPONENT_STD, HAD_MIN, HAD_MAX = 6.0, 15.0, 4.0, 2, 38
 HAS_CAR_PROB, SMOKER_PROB, MALE_PROB = 0.25, 0.2, 0.6
 EGFR_MEAN, EGFR_STD, EGFR_MIN, EGFR_MAX = 90.0, 25.0, 15.0, 140.0
+
+# -----------------------------------------------------------------------------
+# Covariate models
+# -----------------------------------------------------------------------------
+# "submission": independent marginals of the first submission (constants above).
+# "literature": marginals calibrated on published population data (revision):
+#   - age, sex, smoking, SBP: SCORE2 derivation cohorts, Table 1
+#     (Hageman et al., Eur Heart J 2021;42:2439-54, doi:10.1093/eurheartj/ehab309):
+#     age 57 (9) years, 44% men, 15% current smokers, SBP 136 (19) mmHg;
+#   - LDL, HDL, triglycerides, HbA1c: UK Biobank baseline Showcase summaries
+#     (fields 30780, 30760, 30870, 30750);
+#   - non-HDL is derived as LDL + TG/2.2 (Friedewald, mmol/L), so that
+#     LDL < non-HDL by construction; total cholesterol (non-HDL + HDL) then
+#     reproduces the SCORE2 Table 1 value 5.8 (1.1) mmol/L without being
+#     calibrated on it;
+#   - eGFR (CKD-EPI) declines with age as in the Gutenberg Health Study
+#     (Waas et al., Sci Rep 2021;11:10165, doi:10.1038/s41598-021-89442-7):
+#     median about 110 at 35 years and 80-85 at 75 years.
+# Units: LDL, HDL, non-HDL and triglycerides in mmol/L; HbA1c in % (NGSP).
+COVARIATE_MODEL_SUBMISSION = "submission"
+COVARIATE_MODEL_LITERATURE = "literature"
+COVARIATE_MODELS = (COVARIATE_MODEL_SUBMISSION, COVARIATE_MODEL_LITERATURE)
+COVARIATE_MODEL_DEFAULT = COVARIATE_MODEL_LITERATURE
+
+LIT_AGE_MEAN, LIT_AGE_SD, LIT_AGE_MIN, LIT_AGE_MAX = 57.0, 9.0, 40, 89
+LIT_MALE_PROB, LIT_SMOKER_PROB = 0.44, 0.15
+LIT_SBP_MEAN, LIT_SBP_SD, LIT_SBP_MIN, LIT_SBP_MAX = 136.0, 19.0, 90, 200
+LIT_LDL_MEAN, LIT_LDL_SD, LIT_LDL_MIN, LIT_LDL_MAX = 3.56, 0.87, 0.5, 8.0
+LIT_HDL_MEAN, LIT_HDL_SD, LIT_HDL_MIN, LIT_HDL_MAX = 1.45, 0.38, 0.4, 3.5
+LIT_TG_MEDIAN, LIT_TG_SIGMA_LOG = 1.48, 0.57
+FRIEDEWALD_TG_DIVISOR_MMOL = 2.2
+LIT_HBA1C_IFCC_MEDIAN, LIT_HBA1C_SIGMA_LOG = 35.2, 0.117          # mmol/mol
+LIT_EGFR_AT_35, LIT_EGFR_SLOPE_PER_YEAR, LIT_EGFR_RESIDUAL_SD = 110.0, -0.7, 12.0
+# HbA1c with a diabetic tail (sensitivity D.2): mixture with the diabetes
+# prevalence of the Gutenberg Health Study (7.3%) and the HbA1c of people with
+# diabetes in the SCORE2-Diabetes derivation data (ERFC/UK Biobank: 55 (20)
+# mmol/mol; SCORE2-Diabetes Working Group, Eur Heart J 2023;44:2544-56,
+# doi:10.1093/eurheartj/ehad260, Table 1).
+LIT_DIABETES_PREVALENCE = 0.073
+LIT_DIABETES_HBA1C_IFCC_MEAN, LIT_DIABETES_HBA1C_IFCC_SD = 55.0, 20.0
+HBA1C_LAW_DIABETES_MIXTURE = "lognormal_diabetes_mixture"
+
+
+def ifcc_to_ngsp(hba1c_mmol_mol: np.ndarray) -> np.ndarray:
+    """Convert HbA1c from IFCC (mmol/mol) to NGSP (%) units."""
+    return 0.09148 * np.asarray(hba1c_mmol_mol, dtype=float) + 2.152
+
+
+def _truncated_normal(rng: np.random.Generator, mean: float, sd: float, low: float, high: float,
+                      n: int) -> np.ndarray:
+    """Truncated normal by inverse-CDF sampling (exact truncation, no clipping mass)."""
+    from scipy.stats import norm
+
+    a, b = norm.cdf((low - mean) / sd), norm.cdf((high - mean) / sd)
+    return mean + sd * norm.ppf(rng.uniform(a, b, size=n))
+
+
+def _lognormal_from_mean_sd(rng: np.random.Generator, mean: float, sd: float, n: int) -> np.ndarray:
+    s2 = np.log(1.0 + (sd / mean) ** 2)
+    return rng.lognormal(np.log(mean) - s2 / 2.0, np.sqrt(s2), size=n)
+
+
+def _sample_literature_covariates(n: int, rng: np.random.Generator, hba1c_law: str) -> dict[str, np.ndarray]:
+    """Covariates of the "literature" model (see the block comment above)."""
+    age = np.round(_truncated_normal(rng, LIT_AGE_MEAN, LIT_AGE_SD, LIT_AGE_MIN, LIT_AGE_MAX, n)).astype(np.int32)
+    sbp = np.round(_truncated_normal(rng, LIT_SBP_MEAN, LIT_SBP_SD, LIT_SBP_MIN, LIT_SBP_MAX, n)).astype(np.int32)
+    ldl = _truncated_normal(rng, LIT_LDL_MEAN, LIT_LDL_SD, LIT_LDL_MIN, LIT_LDL_MAX, n)
+    hdl = np.clip(_lognormal_from_mean_sd(rng, LIT_HDL_MEAN, LIT_HDL_SD, n), LIT_HDL_MIN, LIT_HDL_MAX)
+    tg = rng.lognormal(np.log(LIT_TG_MEDIAN), LIT_TG_SIGMA_LOG, size=n)
+    non_hdl = ldl + tg / FRIEDEWALD_TG_DIVISOR_MMOL
+    ifcc = rng.lognormal(np.log(LIT_HBA1C_IFCC_MEDIAN), LIT_HBA1C_SIGMA_LOG, size=n)
+    law = str(hba1c_law or HBA1C_LAW_DEFAULT).strip().lower()
+    if law == HBA1C_LAW_DIABETES_MIXTURE:
+        diabetic = rng.random(n) < LIT_DIABETES_PREVALENCE
+        ifcc_d = _lognormal_from_mean_sd(rng, LIT_DIABETES_HBA1C_IFCC_MEAN, LIT_DIABETES_HBA1C_IFCC_SD, n)
+        ifcc = np.where(diabetic, ifcc_d, ifcc)
+    elif law not in (HBA1C_LAW_NORMAL, HBA1C_LAW_LOGNORMAL):
+        raise ValueError(f"Unknown HbA1c law for the literature model: {hba1c_law!r}.")
+    hba1c = np.clip(ifcc_to_ngsp(ifcc), HBA1C_MIN, HBA1C_MAX)
+    egfr = LIT_EGFR_AT_35 + LIT_EGFR_SLOPE_PER_YEAR * (age - 35) + rng.normal(0.0, LIT_EGFR_RESIDUAL_SD, size=n)
+    return {
+        "age": age,
+        "biomarker_hba1c_ngsp_blood": np.round(hba1c, 2),
+        "non_hdl_cholesterol": np.round(non_hdl, 2),
+        "hdl_cholesterol": np.round(hdl, 2),
+        "ldl_cholesterol": np.round(ldl, 2),
+        "triglycerides": np.round(tg, 2),
+        "systolic_blood_pressure": sbp,
+        "estimated_glomerular_filtration_rate": np.round(np.clip(egfr, EGFR_MIN, EGFR_MAX), 2),
+        "is_smoker": rng.binomial(1, LIT_SMOKER_PROB, n).astype(bool),
+        "is_male": rng.binomial(1, LIT_MALE_PROB, n).astype(bool),
+    }
 
 SCORE2_DEFAULT_RISK_REGION = "Low"
 _SCORE2_SCALES: dict[tuple[str, str, str], tuple[float, float]] = {
@@ -364,6 +476,7 @@ def _build_universal_base_cohort(
     hba1c_law: str = HBA1C_LAW_DEFAULT,
     *,
     enforce_min_support: bool = True,
+    covariate_model: str = COVARIATE_MODEL_DEFAULT,
 ) -> tuple[pd.DataFrame, list[str]]:
     """Build a base synthetic cohort before applying prescription rules.
 
@@ -413,7 +526,9 @@ def _build_universal_base_cohort(
             "member_pseudo_id": np.arange(1, n_patients + 1, dtype=np.int32),
             "professional_id": professional_col,
             "age": np.clip(rng.normal(AGE_MEAN, AGE_STD, n_patients), AGE_MIN, AGE_MAX).astype(np.int32),
-            "biomarker_hba1c_ngsp_blood": _sample_hba1c(n_patients, rng, law=hba1c_law),
+            "biomarker_hba1c_ngsp_blood": _sample_hba1c(
+                n_patients, rng, law=hba1c_law if covariate_model == COVARIATE_MODEL_SUBMISSION else HBA1C_LAW_NORMAL
+            ),
             "non_hdl_cholesterol": np.round(np.clip(rng.normal(NON_HDL_MMOL_MEAN, NON_HDL_MMOL_STD, n_patients), NON_HDL_MMOL_MIN, NON_HDL_MMOL_MAX), 2).astype(np.float64),
             "hdl_cholesterol": np.round(np.clip(rng.normal(HDL_MMOL_MEAN, HDL_MMOL_STD, n_patients), HDL_MMOL_MIN, HDL_MMOL_MAX), 2).astype(np.float64),
             "ldl_cholesterol": np.round(np.clip(rng.normal(LDL_MMOL_MEAN, LDL_MMOL_STD, n_patients), LDL_MMOL_MIN, LDL_MMOL_MAX), 2).astype(np.float64),
@@ -426,6 +541,12 @@ def _build_universal_base_cohort(
             "has_car": rng.binomial(1, HAS_CAR_PROB, n_patients).astype(bool),
         }
     )
+    if covariate_model == COVARIATE_MODEL_LITERATURE:
+        lit_rng = np.random.default_rng(int(random_state) + 2_027)
+        for col, values in _sample_literature_covariates(n_patients, lit_rng, hba1c_law).items():
+            df[col] = values
+    elif covariate_model != COVARIATE_MODEL_SUBMISSION:
+        raise ValueError(f"Unknown covariate_model {covariate_model!r}; expected one of {COVARIATE_MODELS}.")
     if pairwise_correlation is not None:
         var_a, var_b, rho = pairwise_correlation
         # Dedicated RNG for the copula so the main sampling stream is unchanged.
@@ -617,6 +738,136 @@ def _sample_quantile_threshold_for_column(values: np.ndarray, q: float) -> float
     return float(np.quantile(arr, q_clipped))
 
 
+def _is_binary_column(values: np.ndarray) -> bool:
+    """Return True when the column takes at most two distinct finite values."""
+    arr = np.asarray(values, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    return np.unique(arr).size <= 2
+
+
+def _binary_majority_level(values: np.ndarray) -> float:
+    """Return the most frequent level of a binary column (ties: the lower level)."""
+    arr = np.asarray(values, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    levels, counts = np.unique(arr, return_counts=True)
+    return float(levels[int(np.argmax(counts))])
+
+
+def _binary_condition_mask(df: pd.DataFrame, binary_vars: list[str]) -> tuple[np.ndarray, dict[str, float]]:
+    """Mask of patients at the majority level of every binary covariate."""
+    mask = np.ones(len(df), dtype=bool)
+    levels: dict[str, float] = {}
+    for col in binary_vars:
+        values = df[col].to_numpy(dtype=float)
+        level = _binary_majority_level(values)
+        levels[col] = level
+        mask &= values == level
+    return mask, levels
+
+
+def _split_binary_continuous(df: pd.DataFrame, variables: list[str]) -> tuple[list[str], list[str]]:
+    binary_vars = [c for c in variables if _is_binary_column(df[c].to_numpy())]
+    continuous_vars = [c for c in variables if c not in binary_vars]
+    return binary_vars, continuous_vars
+
+
+def max_attainable_joint_eligibility(
+    df: pd.DataFrame, variables: list[str], q_max: float = JOINT_CALIBRATION_Q_MAX
+) -> float:
+    """Largest joint eligibility reachable by the "target_joint" rule family.
+
+    Every covariate of the window must restrict eligibility: binary covariates
+    are fixed at their majority level and continuous covariates use a
+    per-variable quantile of at most ``q_max``.
+    """
+    binary_vars, continuous_vars = _split_binary_continuous(df, variables)
+    mask, _ = _binary_condition_mask(df, binary_vars)
+    for col in continuous_vars:
+        values = df[col].to_numpy(dtype=float)
+        mask &= values <= float(np.quantile(values[np.isfinite(values)], q_max))
+    return float(mask.mean())
+
+
+def calibrate_joint_thresholds(
+    df: pd.DataFrame,
+    variables: list[str],
+    target_eligibility: float,
+    q_max: float = JOINT_CALIBRATION_Q_MAX,
+    n_iter: int = JOINT_CALIBRATION_N_ITER,
+) -> dict[str, Any]:
+    """Calibrate the eligibility rule of a window on its realised joint eligibility.
+
+    Binary covariates are always active and fixed at their majority level
+    (condition ``x == level``). Continuous covariates use ``x <= tau`` with one
+    shared per-variable quantile q in [0, q_max], chosen by bisection so that
+    the empirical fraction of patients satisfying every condition is as close
+    as possible to ``target_eligibility``. The empirical fraction is
+    non-decreasing in q, so bisection is valid without any independence
+    assumption between covariates.
+
+    Returns:
+        Dict with ``mask`` (boolean eligibility), ``conditions`` (variable ->
+        (operator, value)), ``per_variable_quantile`` (None for binary-only
+        windows), ``realised_eligibility``, ``binary_variables``,
+        ``continuous_variables`` and ``attainable`` (False when the target lies
+        outside the attainable range by more than 0.01).
+    """
+    if not variables:
+        raise ValueError("calibrate_joint_thresholds requires at least one variable.")
+    if not (0.0 < q_max <= 1.0):
+        raise ValueError(f"q_max must lie in (0, 1]; got {q_max!r}.")
+    binary_vars, continuous_vars = _split_binary_continuous(df, variables)
+    mask_binary, levels = _binary_condition_mask(df, binary_vars)
+    conditions: dict[str, tuple[str, float]] = {c: ("==", v) for c, v in levels.items()}
+
+    if not continuous_vars:
+        realised = float(mask_binary.mean())
+        return {
+            "mask": mask_binary,
+            "conditions": {c: conditions[c] for c in variables},
+            "per_variable_quantile": None,
+            "realised_eligibility": realised,
+            "binary_variables": binary_vars,
+            "continuous_variables": continuous_vars,
+            "attainable": bool(abs(realised - target_eligibility) <= 0.01),
+        }
+
+    cont_values = {c: df[c].to_numpy(dtype=float) for c in continuous_vars}
+
+    def _evaluate(q: float) -> tuple[float, dict[str, float], np.ndarray]:
+        mask = mask_binary.copy()
+        taus: dict[str, float] = {}
+        for col, values in cont_values.items():
+            tau = float(np.quantile(values[np.isfinite(values)], q))
+            taus[col] = tau
+            mask &= values <= tau
+        return float(mask.mean()), taus, mask
+
+    lo, hi = 0.0, float(q_max)
+    best = (hi,) + _evaluate(hi)
+    if best[1] > target_eligibility:
+        for _ in range(int(n_iter)):
+            mid = 0.5 * (lo + hi)
+            cand = (mid,) + _evaluate(mid)
+            if abs(cand[1] - target_eligibility) < abs(best[1] - target_eligibility):
+                best = cand
+            if cand[1] < target_eligibility:
+                lo = mid
+            else:
+                hi = mid
+    best_q, best_frac, best_taus, best_mask = best
+    conditions.update({c: ("<=", t) for c, t in best_taus.items()})
+    return {
+        "mask": best_mask,
+        "conditions": {c: conditions[c] for c in variables},
+        "per_variable_quantile": float(best_q),
+        "realised_eligibility": float(best_frac),
+        "binary_variables": binary_vars,
+        "continuous_variables": continuous_vars,
+        "attainable": bool(abs(best_frac - target_eligibility) <= 0.01),
+    }
+
+
 def _build_group_probability_maps(professionals: list[str]) -> tuple[dict[str, float], dict[str, float]]:
     group_boundaries = ((0, 4), (4, 8), (8, 12), (12, 16), (16, 20))
     p_high: dict[str, float] = {}
@@ -681,6 +932,9 @@ def generate_progressive_rule_experiment(
     threshold_strategy: str = THRESHOLD_STRATEGY_DEFAULT,
     target_eligibility_low: float = TARGET_ELIGIBILITY_DEFAULT_LOW,
     target_eligibility_high: float = TARGET_ELIGIBILITY_DEFAULT_HIGH,
+    covariate_model: str = COVARIATE_MODEL_DEFAULT,
+    pairwise_correlation: tuple[str, str, float] | None = None,
+    hba1c_law: str = HBA1C_LAW_DEFAULT,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Generate one synthetic experiment for the given progressive rule definition.
 
@@ -691,9 +945,14 @@ def generate_progressive_rule_experiment(
             joint eligibility ``Pr(eligible) ≈ p_star`` regardless of the
             window size, where ``p_star`` is drawn per-experiment from
             ``Uniform(target_eligibility_low, target_eligibility_high)``.
+            ``"target_joint"`` (default) calibrates the rule on the realised
+            joint eligibility of the cohort (see ``calibrate_joint_thresholds``):
+            binary covariates are fixed at their majority level, continuous
+            covariates share a quantile capped at ``JOINT_CALIBRATION_Q_MAX``,
+            and ``p_star`` is drawn within the attainable range of the window.
         target_eligibility_low / target_eligibility_high: Range from which
-            ``p_star`` is drawn. Only used when ``threshold_strategy ==
-            "target_quantile"``. Both must lie in ``(0, 1]`` with low <= high.
+            ``p_star`` is drawn. Used by ``"target_quantile"`` and
+            ``"target_joint"``. Both must lie in ``(0, 1]`` with low <= high.
     """
     _validate_counts(n_patients, expected_n_pros)
     if expected_n_pros != 20:
@@ -701,12 +960,11 @@ def generate_progressive_rule_experiment(
             "generate_progressive_rule_experiment requires expected_n_pros=20 (got %d)."
             % expected_n_pros
         )
-    if threshold_strategy not in (THRESHOLD_STRATEGY_UNIFORM, THRESHOLD_STRATEGY_TARGET_QUANTILE):
+    if threshold_strategy not in THRESHOLD_STRATEGIES:
         raise ValueError(
-            f"Unknown threshold_strategy={threshold_strategy!r}; "
-            f"expected one of ({THRESHOLD_STRATEGY_UNIFORM!r}, {THRESHOLD_STRATEGY_TARGET_QUANTILE!r})."
+            f"Unknown threshold_strategy={threshold_strategy!r}; expected one of {THRESHOLD_STRATEGIES!r}."
         )
-    if threshold_strategy == THRESHOLD_STRATEGY_TARGET_QUANTILE:
+    if threshold_strategy in (THRESHOLD_STRATEGY_TARGET_QUANTILE, THRESHOLD_STRATEGY_TARGET_JOINT):
         if not (0.0 < target_eligibility_low <= target_eligibility_high <= 1.0):
             raise ValueError(
                 f"Invalid target eligibility range "
@@ -715,7 +973,10 @@ def generate_progressive_rule_experiment(
             )
     n_patients = _ensure_min_support(n_patients, expected_n_pros, logger)
     base_seed = int(random_state) + int(experiment_index) * 1_009
-    df, professionals = _build_universal_base_cohort(n_patients, expected_n_pros, base_seed)
+    df, professionals = _build_universal_base_cohort(
+        n_patients, expected_n_pros, base_seed, pairwise_correlation=pairwise_correlation,
+        hba1c_law=hba1c_law, covariate_model=covariate_model,
+    )
     df["score2_ten_year_cvd_risk_percent"] = np.round(
         score2_ten_year_risk_percent_vectorized(df, risk_region=SCORE2_DEFAULT_RISK_REGION), 2
     )
@@ -729,6 +990,9 @@ def generate_progressive_rule_experiment(
     thresholds: dict[str, float] = {}
     target_eligibility: Optional[float] = None
     per_variable_quantile: Optional[float] = None
+    calibration_attainable: Optional[bool] = None
+    max_attainable_eligibility: Optional[float] = None
+    binary_variables: list[str] = []
     if rule_type == "score2":
         eligibility_mask = _calculate_score2_moderate_or_high_vectorized(df).to_numpy(dtype=bool)
         rule_name = "score2"
@@ -737,24 +1001,47 @@ def generate_progressive_rule_experiment(
     else:
         if not variables:
             raise ValueError("Window-threshold rule must include at least one variable.")
-        if threshold_strategy == THRESHOLD_STRATEGY_TARGET_QUANTILE:
+        if threshold_strategy in (THRESHOLD_STRATEGY_TARGET_QUANTILE, THRESHOLD_STRATEGY_TARGET_JOINT):
             # Draw the target joint eligibility for this experiment, then
             # invert through the window size so that, under independence,
             # Pr(eligible) ≈ p_star regardless of window_size. The same
             # threshold_rng is consumed first for p_star and then for any
             # downstream randomness, keeping the per-experiment seed stable.
-            if target_eligibility_low == target_eligibility_high:
-                target_eligibility = float(target_eligibility_low)
+            draw_low, draw_high = float(target_eligibility_low), float(target_eligibility_high)
+            if threshold_strategy == THRESHOLD_STRATEGY_TARGET_JOINT:
+                # Restrict the draw to the attainable range of this window so
+                # that the realised eligibility matches the target.
+                missing = [c for c in variables if c not in df.columns]
+                if missing:
+                    raise ValueError(f"Missing fixed effect column(s) in generated dataset: {missing}.")
+                max_attainable_eligibility = max_attainable_joint_eligibility(df, variables)
+                draw_high = min(draw_high, max_attainable_eligibility)
+                draw_low = min(draw_low, draw_high)
+            if draw_low == draw_high:
+                target_eligibility = float(draw_low)
             else:
-                target_eligibility = float(
-                    threshold_rng.uniform(target_eligibility_low, target_eligibility_high)
-                )
+                target_eligibility = float(threshold_rng.uniform(draw_low, draw_high))
             per_variable_quantile = float(target_eligibility ** (1.0 / max(int(window_size), 1)))
-        masks: list[np.ndarray] = []
         for col in variables:
             if col not in df.columns:
                 raise ValueError(f"Missing fixed effect column in generated dataset: '{col}'.")
-            if threshold_strategy == THRESHOLD_STRATEGY_TARGET_QUANTILE:
+        if threshold_strategy == THRESHOLD_STRATEGY_TARGET_JOINT:
+            calibration = calibrate_joint_thresholds(df, variables, float(target_eligibility))
+            per_variable_quantile = calibration["per_variable_quantile"]
+            calibration_attainable = bool(calibration["attainable"])
+            binary_variables = list(calibration["binary_variables"])
+        masks: list[np.ndarray] = []
+        for col in variables:
+            if threshold_strategy == THRESHOLD_STRATEGY_TARGET_JOINT:
+                operator, threshold = calibration["conditions"][col]
+                thresholds[col] = float(threshold)
+                masks.append(
+                    df[col].to_numpy(dtype=float) == threshold
+                    if operator == "=="
+                    else df[col].to_numpy(dtype=float) <= threshold
+                )
+                continue
+            elif threshold_strategy == THRESHOLD_STRATEGY_TARGET_QUANTILE:
                 threshold = _sample_quantile_threshold_for_column(
                     df[col].to_numpy(), per_variable_quantile  # type: ignore[arg-type]
                 )
@@ -765,11 +1052,23 @@ def generate_progressive_rule_experiment(
         eligibility_mask = np.logical_and.reduce(masks) if masks else np.zeros(len(df), dtype=bool)
         vars_token = "_".join(_sanitize_strategy_token(col) for col in variables)
         rule_name = f"w{window_size}_{vars_token}_pass{pass_index}"
-        threshold_str = ", ".join(f"{k} <= {v:.4g}" for k, v in thresholds.items())
+        if threshold_strategy == THRESHOLD_STRATEGY_TARGET_JOINT:
+            threshold_str = ", ".join(
+                f"{k} {calibration['conditions'][k][0]} {v:.4g}" for k, v in thresholds.items()
+            )
+        else:
+            threshold_str = ", ".join(f"{k} <= {v:.4g}" for k, v in thresholds.items())
         if threshold_strategy == THRESHOLD_STRATEGY_TARGET_QUANTILE:
             rule_description = (
                 f"All true among: {threshold_str} "
                 f"(target p*={target_eligibility:.3f}, per-variable q={per_variable_quantile:.3f})"
+            )
+        elif threshold_strategy == THRESHOLD_STRATEGY_TARGET_JOINT:
+            q_txt = "n/a" if per_variable_quantile is None else f"{per_variable_quantile:.3f}"
+            rule_description = (
+                f"All true among: {threshold_str} "
+                f"(target p*={target_eligibility:.3f}, realised={float(np.mean(eligibility_mask)):.3f}, "
+                f"continuous q={q_txt})"
             )
         else:
             rule_description = f"All true among: {threshold_str}"
@@ -819,6 +1118,10 @@ def generate_progressive_rule_experiment(
         "threshold_strategy": threshold_strategy,
         "target_eligibility": target_eligibility,
         "per_variable_quantile": per_variable_quantile,
+        "realised_eligibility": float(np.mean(eligibility_mask)),
+        "calibration_attainable": calibration_attainable,
+        "max_attainable_eligibility": max_attainable_eligibility,
+        "binary_variables": binary_variables,
     }
 
 
@@ -862,6 +1165,7 @@ def generate_score2_five_groups_heter_patients(
     logger: Optional[Any] = None,
     pairwise_correlation: tuple[str, str, float] | None = None,
     hba1c_law: str = HBA1C_LAW_DEFAULT,
+    covariate_model: str = COVARIATE_MODEL_DEFAULT,
     ) -> pd.DataFrame:
     """Generate a synthetic dataset with 20 physicians and 5 SCORE2-based categories.
 
@@ -885,6 +1189,7 @@ def generate_score2_five_groups_heter_patients(
         n_patients, expected_n_pros, random_state,
         pairwise_correlation=pairwise_correlation,
         hba1c_law=hba1c_law,
+        covariate_model=covariate_model,
     )
     df["score2_ten_year_cvd_risk_percent"] = np.round(
         score2_ten_year_risk_percent_vectorized(df, risk_region=SCORE2_DEFAULT_RISK_REGION), 2
@@ -934,6 +1239,7 @@ def generate_score2_continuous_heterogeneity(
     hba1c_law: str = HBA1C_LAW_DEFAULT,
     *,
     enforce_min_support: bool = True,
+    covariate_model: str = COVARIATE_MODEL_DEFAULT,
     n_matching_covariates: int | None = None,
     n_continuous_covariates: int | None = None,
     n_categorical_covariates: int | None = None,
@@ -1007,6 +1313,7 @@ def generate_score2_continuous_heterogeneity(
         pairwise_correlation=pairwise_correlation,
         hba1c_law=hba1c_law,
         enforce_min_support=enforce_min_support,
+        covariate_model=covariate_model,
     )
 
     matching_covariates: list[str] = []
@@ -1221,3 +1528,150 @@ def generate_score2_latent_covariate(
             100.0 * n_z_in_borderline / max(1, n_borderline),
         )
     return df
+
+
+# -----------------------------------------------------------------------------
+# Public helpers used by the benchmark runner (src/benchmark/runner.py)
+# -----------------------------------------------------------------------------
+
+
+def five_group_physician_parameters(expected_n_pros: int = 20) -> dict[str, dict[str, float]]:
+    """Prescribing probabilities and group of each physician of the five-group design."""
+    professionals = _professional_ids(expected_n_pros)
+    p_high, p_low = _build_group_probability_maps(professionals)
+    group_of = {pid: 1 + i // 4 for i, pid in enumerate(professionals)}
+    return {pid: {"p_high": p_high[pid], "p_low": p_low[pid], "group": group_of[pid]} for pid in professionals}
+
+
+def build_base_cohort(
+    n_patients: int,
+    expected_n_pros: int,
+    random_state: int,
+    pairwise_correlation: tuple[str, str, float] | None = None,
+    hba1c_law: str = HBA1C_LAW_DEFAULT,
+    covariate_model: str = COVARIATE_MODEL_DEFAULT,
+) -> pd.DataFrame:
+    """Covariates and physician allocation, before any eligibility rule or outcome."""
+    df, _ = _build_universal_base_cohort(
+        n_patients, expected_n_pros, random_state,
+        pairwise_correlation=pairwise_correlation, hba1c_law=hba1c_law,
+        covariate_model=covariate_model,
+    )
+    df["score2_ten_year_cvd_risk_percent"] = np.round(
+        score2_ten_year_risk_percent_vectorized(df, risk_region=SCORE2_DEFAULT_RISK_REGION), 2
+    )
+    return df
+
+
+def apply_recorded_rule(df: pd.DataFrame, metadata: dict[str, Any]) -> np.ndarray:
+    """Re-apply the eligibility rule recorded by ``generate_progressive_rule_experiment``.
+
+    Thresholds are taken as recorded (not recalibrated), so a development
+    cohort receives exactly the same rule as the benchmark cohort.
+    """
+    if metadata.get("rule_type") == "score2" or not metadata.get("variables"):
+        return _calculate_score2_moderate_or_high_vectorized(df).to_numpy(dtype=bool)
+    binary = set(metadata.get("binary_variables") or [])
+    joint = metadata.get("threshold_strategy") == THRESHOLD_STRATEGY_TARGET_JOINT
+    mask = np.ones(len(df), dtype=bool)
+    for col, thr in metadata["rule_thresholds"].items():
+        values = df[col].to_numpy(dtype=float)
+        mask &= (values == thr) if (joint and col in binary) else (values <= thr)
+    return mask
+
+
+def draw_prescriptions(
+    df: pd.DataFrame,
+    eligibility_mask: np.ndarray,
+    physician_parameters: dict[str, dict[str, float]],
+    random_state: int,
+) -> np.ndarray:
+    """Bernoulli prescriptions given eligibility and physician-specific probabilities."""
+    phys = df["professional_id"].astype(str)
+    p_high = phys.map({k: v["p_high"] for k, v in physician_parameters.items()}).to_numpy(dtype=float)
+    p_low = phys.map({k: v["p_low"] for k, v in physician_parameters.items()}).to_numpy(dtype=float)
+    p = np.where(np.asarray(eligibility_mask, dtype=bool), p_high, p_low)
+    return np.random.default_rng(random_state).binomial(1, p).astype(np.int32)
+
+
+# -----------------------------------------------------------------------------
+# Scenario E1: unobserved determinant of prescribing (R2 comment 11)
+# -----------------------------------------------------------------------------
+LATENT_INFLUENCE_STRATEGY = "score2_latent_influence"
+LATENT_U_COL = "latent_u"
+_GH_NODES, _GH_WEIGHTS = np.polynomial.hermite_e.hermegauss(80)
+_GH_WEIGHTS = _GH_WEIGHTS / _GH_WEIGHTS.sum()
+
+
+def _expit(x: np.ndarray) -> np.ndarray:
+    return 1.0 / (1.0 + np.exp(-x))
+
+
+def latent_influence_physician_truth(p_high: float, gamma: float) -> dict[str, float]:
+    """Calibrated intercept and both ground truths for one physician.
+
+    The eligible-patient prescribing probability is pi(U) = expit(alpha + gamma U),
+    with U ~ N(0, 1) seen by the physician but not by the analyst. alpha is
+    chosen so that E[pi(U)] = p_high: the marginal prescribing rate, hence the
+    observable discordance 2 p_high (1 - p_high), does not depend on gamma.
+
+    - observable discordance: probability that two eligible patients with
+      independent U receive discordant decisions, 2 p_high (1 - p_high);
+    - intrinsic inconsistency: probability of discordance between two eligible
+      patients sharing the same U, E[2 pi(U) (1 - pi(U))].
+
+    The gap equals 2 Var(pi(U)). Expectations use 80-point Gauss-Hermite quadrature.
+    """
+    from scipy.optimize import brentq
+
+    p = float(p_high)
+    if p <= 0.0 or p >= 1.0 or gamma == 0.0:
+        intrinsic = 2.0 * p * (1.0 - p)
+        alpha = float("inf") if p >= 1.0 else (float("-inf") if p <= 0.0 else float(np.log(p / (1 - p))))
+        return {"alpha": alpha, "D_observable": 2.0 * p * (1.0 - p), "D_intrinsic": intrinsic}
+    alpha = brentq(lambda a: float(np.sum(_GH_WEIGHTS * _expit(a + gamma * _GH_NODES))) - p, -60.0, 60.0)
+    pi = _expit(alpha + gamma * _GH_NODES)
+    return {
+        "alpha": float(alpha),
+        "D_observable": 2.0 * p * (1.0 - p),
+        "D_intrinsic": float(np.sum(_GH_WEIGHTS * 2.0 * pi * (1.0 - pi))),
+    }
+
+
+def generate_score2_latent_influence(
+    n_patients: int = SCORE2_FIVE_GROUPS_DEFAULT_N_PATIENTS,
+    expected_n_pros: int = SCORE2_FIVE_GROUPS_DEFAULT_N_PHYSICIANS,
+    random_state: int = 42,
+    gamma: float = 1.0,
+    covariate_model: str = COVARIATE_MODEL_DEFAULT,
+    hba1c_law: str = HBA1C_LAW_DEFAULT,
+) -> tuple[pd.DataFrame, dict[str, dict[str, float]]]:
+    """SCORE2 five-group cohort where an unobserved U drives eligible prescriptions.
+
+    Covariates, physician allocation and eligibility are those of
+    ``generate_score2_five_groups_heter_patients`` with the same seed, so that
+    experiments differing only by ``gamma`` share the same patients and the
+    same U (common random numbers). Ineligible patients are prescribed with
+    p_low as in the main design. U is stored in ``LATENT_U_COL`` and must not
+    be used as a matching covariate.
+    """
+    df = generate_score2_five_groups_heter_patients(
+        n_patients=n_patients, expected_n_pros=expected_n_pros, random_state=random_state,
+        hba1c_law=hba1c_law, covariate_model=covariate_model,
+    )
+    eligible = _calculate_score2_moderate_or_high_vectorized(df).to_numpy(dtype=bool)
+    params = five_group_physician_parameters(expected_n_pros)
+    for pid, par in params.items():
+        par.update(latent_influence_physician_truth(par["p_high"], float(gamma)))
+        par["gamma"] = float(gamma)
+    u = np.random.default_rng(random_state + 90).standard_normal(len(df))
+    phys = df["professional_id"].astype(str).to_numpy()
+    alpha = np.array([params[p]["alpha"] for p in phys])
+    p_low = np.array([params[p]["p_low"] for p in phys])
+    with np.errstate(over="ignore", invalid="ignore"):
+        pi = np.where(np.isinf(alpha), (alpha > 0).astype(float), _expit(alpha + float(gamma) * u))
+    prob = np.where(eligible, pi, p_low)
+    df[LATENT_U_COL] = u
+    df["generation_rule_mask"] = eligible
+    df["recommendation"] = np.random.default_rng(random_state + 40).binomial(1, prob).astype(np.int32)
+    return df, params

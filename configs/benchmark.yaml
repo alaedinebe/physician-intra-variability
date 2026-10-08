@@ -1,0 +1,93 @@
+# Configuration of the revised benchmark (src/benchmark/runner.py).
+#
+#   python -m src.benchmark.runner --config configs/benchmark.yaml --list    # print the plan
+#   python -m src.benchmark.runner --config configs/benchmark.yaml --smoke   # quick end-to-end check
+#   python -m src.benchmark.runner --config configs/benchmark.yaml           # full run (resumable)
+#
+# Designs: in_sample, fold_restricted, kfold, lopo, external,
+#          oracle_eligible, oracle_ineligible (see src/benchmark/designs.py).
+
+run_id: "revision_main"   # results/revision_v1 = check run with the first-submission covariates
+output_dir: "results"
+seed: 42
+k_folds: 5
+caliper_percentile: 25.0
+threshold_strategy: "target_joint"   # progressive rules; see src/synthetic_generator.py
+covariate_model: "literature"        # Table 2 of the revision; "submission" = first submission
+hba1c_law: "lognormal"               # literature model: UK Biobank-calibrated log-normal
+
+genetic:
+  enabled: true
+  variant: "genmatch"                # Diamond and Sekhon; "legacy" = first submission
+  also_run_variants: ["legacy"]      # legacy variant reported for comparison only
+  workers: -1                        # differential evolution workers (-1 = all cores)
+
+# Per-method restrictions, mainly to bound the cost of genetic matching.
+method_rules:
+  genetic_mahalanobis:
+    exclude_designs: ["lopo"]
+    exclude_families: ["continuous"]
+    designs_only_in_families:
+      kfold: ["score2"]
+      external: ["score2"]
+  genetic_mahalanobis_legacy:
+    exclude_designs: ["fold_restricted", "kfold", "lopo", "external", "oracle_eligible", "oracle_ineligible"]
+    exclude_families: ["continuous", "progressive", "sensitivity_diabetes_hba1c", "latent"]   # weights cancel exactly; SCORE2 and D.1 suffice
+
+families:
+  score2:
+    enabled: true
+    n_patients: 10000
+    n_physicians: 20
+    seed: 142                        # seed of the first-submission SCORE2 experiment
+    designs: [in_sample, fold_restricted, kfold, lopo, external, oracle_eligible, oracle_ineligible]
+    caliper_sensitivity: [10, 50, null]        # null = no caliper (R2 comment 5)
+    caliper_sensitivity_designs: [in_sample, oracle_eligible]
+
+  progressive:
+    enabled: true
+    n_patients: 10000
+    n_physicians: 20
+    n_passes: 2
+    seed: 42
+    designs: [in_sample, fold_restricted, oracle_eligible, oracle_ineligible]
+    cross_fitting_every: 3           # one experiment in three (30 of 90), stratified by plan order
+    cross_fitting_designs: [kfold, lopo, external]
+    caliper_sensitivity: [10, 50, null]        # on the same 30 experiments as cross-fitting
+    caliper_sensitivity_designs: [in_sample, oracle_eligible]
+
+  sensitivity_independent:          # D.1: independent marginals of the first submission
+    enabled: true
+    n_patients: 10000
+    n_physicians: 20
+    seed: 242
+    covariate_model: "submission"
+    hba1c_law: "normal"
+    designs: [in_sample, oracle_eligible, oracle_ineligible]
+
+  sensitivity_diabetes_hba1c:       # D.2: HbA1c mixture with a diabetic tail
+    enabled: true
+    n_patients: 10000
+    n_physicians: 20
+    seed: 342
+    hba1c_law: "lognormal_diabetes_mixture"
+    designs: [in_sample, oracle_eligible, oracle_ineligible]
+
+  latent:                          # E1: unobserved determinant U of prescribing (R2 comment 11)
+    enabled: true
+    n_patients: 10000
+    n_physicians: 20
+    seed: 542
+    gammas: [0, 0.5, 1, 2, 4]        # 0 reproduces the main design
+    n_replicates: 3                  # same patients and same U across gammas within a replicate
+    designs: [in_sample, oracle_eligible]
+
+  continuous:
+    enabled: true
+    n_patients: 20000
+    n_physicians: 50
+    seed: 442
+    n_replicates: 200                # Monte Carlo replications (R2 comment 4)
+    designs: [in_sample, oracle_eligible]
+    cross_fitting_replicates: 10     # cross-fitting on the first replicates only
+    cross_fitting_designs: [fold_restricted, kfold, lopo, external]
