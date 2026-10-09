@@ -1,0 +1,45 @@
+# Complement to configs/grids.yaml: cells below 90 patients per physician.
+# The generator raises every cohort to at least 90 patients per physician
+# (MIN_PATIENTS_PER_PHYSICIAN_BASE). In revision_grids the cells
+# "50 patients per physician" and "5000 patients x 100 physicians" were
+# therefore simulated with 90 patients per physician (realised sizes are
+# recorded in n_patients_cohort and are used by metrics.py). This run lowers
+# the floor to obtain the intended small panels.
+#
+#   python -m src.benchmark.runner --config configs/grids_small.yaml --workers 4
+#   python -m src.benchmark.metrics --run results/revision_grids --add-run results/revision_grids_small
+
+run_id: "revision_grids_small"
+output_dir: "results"
+seed: 7000
+k_folds: 5
+caliper_percentile: 25.0
+threshold_strategy: "target_joint"
+covariate_model: "literature"
+hba1c_law: "lognormal"
+min_patients_per_physician: 20
+
+genetic:
+  enabled: false
+glmm_variants:
+  enabled: false
+glmm_diagnostics:
+  enabled: false
+
+families:
+  grid_panel:
+    enabled: true
+    seed: 17000
+    patients_per_physician: [50]
+    n_physicians: [20, 50, 100]
+    n_replicates: 50
+    designs: [in_sample, oracle_eligible]
+    methods: [euclidean, mahalanobis, learned_weights, mutual_information, rf_proximity, glmm]
+  grid_cohort_panel:
+    enabled: true
+    seed: 19000
+    n_patients: [5000]
+    n_physicians: [100]
+    n_replicates: 30
+    designs: [in_sample, oracle_eligible]
+    methods: [euclidean, mahalanobis, learned_weights, mutual_information, rf_proximity, glmm]

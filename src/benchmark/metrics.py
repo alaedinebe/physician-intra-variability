@@ -122,6 +122,7 @@ def experiment_metrics(df: pd.DataFrame, reference: str = "D_tilde",
     """One row per (experiment, method, design, caliper) with error, calibration and coverage metrics."""
     keys = EXPERIMENT_KEYS + ["method", "supervised", "design", "computed_as", "caliper_percentile", "score_type"]
     first_cols = ["window_size", "pass_index", "realised_eligibility", "n_binary_rule_variables",
+                  "n_patients_cohort", "n_physicians",
                   "latent_gamma", "replicate", "covariate_model", "hba1c_law", "calibration_attainable"]
     rows = []
     for key, g in df.groupby(keys, dropna=False, sort=False):
@@ -507,7 +508,59 @@ def glmm_diagnostics_tables(run_dir: Path, families: Optional[dict] = None) -> d
     return out
 
 
+GRID_FAMILIES = ("grid_panel", "grid_cohort_panel")
+
+
+def grid_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Monte Carlo grids (R2 comments 4 and 10): one independent cohort per replicate.
+
+    grid_panel: Spearman and Kendall correlations with D_star, by patients per
+    physician and number of physicians, with the minimum panel size reaching a
+    target median correlation. grid_cohort_panel: bias and MAE against D_tilde
+    by cohort size and number of physicians. Uncertainty is Monte Carlo
+    (MCSE, 2.5 and 97.5 percentiles over replicates).
+    """
+    out: dict[str, pd.DataFrame] = {}
+    g = df[df["family"].isin(GRID_FAMILIES)]
+    if g.empty:
+        return out
+    g = main_caliper(g)
+    exp = experiment_metrics(g, "D_tilde")
+    exp = exp.rename(columns={"n_physicians": "n_physicians_scored"})
+    sizes = g.drop_duplicates("experiment_id").set_index("experiment_id")[["n_patients_cohort", "n_physicians"]]
+    exp = exp.drop(columns=[c for c in ("n_patients_cohort",) if c in exp.columns]).join(sizes, on="experiment_id")
+    exp["patients_per_physician"] = (exp["n_patients_cohort"] / exp["n_physicians"]).round().astype(int)
+    out["grid_experiment_metrics"] = exp
+    panel = exp[exp["family"] == "grid_panel"]
+    if not panel.empty:
+        keys = ["design", "patients_per_physician", "n_physicians"]
+        out["grid_panel_monte_carlo"] = monte_carlo_summary(panel, ["spearman", "kendall"], by=keys)
+        mc = out["grid_panel_monte_carlo"]
+        rows = []
+        for target in (0.5, 0.7, 0.8, 0.9):
+            sub = mc[(mc["metric"] == "spearman") & (mc["design"] == "in_sample")]
+            for (method, J), h in sub.groupby(["method", "n_physicians"]):
+                ok = h[h["median"] >= target].sort_values("patients_per_physician")
+                rows.append({"method": method, "n_physicians": J, "target_median_spearman": target,
+                             "min_patients_per_physician": int(ok["patients_per_physician"].iloc[0]) if len(ok) else np.nan})
+        out["grid_panel_minimum_size"] = _order_methods(pd.DataFrame(rows))
+        diffs = []
+        for (m, J), h in panel[panel["design"] == "in_sample"].groupby(["patients_per_physician", "n_physicians"]):
+            d = paired_method_differences(h, "spearman", monte_carlo=True)
+            diffs.append(d.assign(patients_per_physician=m, n_physicians=J))
+        out["grid_panel_paired_spearman"] = pd.concat(diffs, ignore_index=True) if diffs else pd.DataFrame()
+    cohort = exp[exp["family"] == "grid_cohort_panel"]
+    if not cohort.empty:
+        out["grid_cohort_panel_monte_carlo"] = monte_carlo_summary(
+            cohort, ["bias", "mae", "calibration_slope", "spearman", "retention"],
+            by=["design", "n_patients_cohort", "n_physicians"])
+    return out
+
+
 def build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    tables: dict[str, pd.DataFrame] = {}
+    if df["family"].isin(GRID_FAMILIES).all():
+        return grid_tables(df)
     main = main_caliper(df)
     exp_tilde = experiment_metrics(main, "D_tilde")
     exp_star = experiment_metrics(main, "D_star")
@@ -587,9 +640,17 @@ def key_numbers(tables: dict[str, pd.DataFrame]) -> dict:
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--run", type=Path, required=True, help="Run directory containing benchmark_long.csv.gz.")
+    parser.add_argument("--add-run", type=Path, nargs="*", default=[],
+                        help="Further run directories whose rows are appended (e.g. a complementary grid run).")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     df = load(args.run)
+    for extra in args.add_run:
+        more = load(extra)
+        clash = set(more["experiment_id"]) & set(df["experiment_id"])
+        if clash:
+            more = more.assign(experiment_id=more["experiment_id"] + "@" + extra.name)
+        df = pd.concat([df, more], ignore_index=True)
     tables = build_tables(df)
     tables.update(glmm_diagnostics_tables(
         args.run, df.drop_duplicates("experiment_id").set_index("experiment_id")["family"].to_dict()))

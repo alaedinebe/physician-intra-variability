@@ -731,6 +731,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     cfg = yaml.safe_load(args.config.read_text(encoding="utf-8"))
     if args.smoke:
         cfg = apply_smoke(cfg)
+    if cfg.get("min_patients_per_physician") is not None:
+        # The generator raises any cohort to at least 90 patients per physician
+        # (MIN_PATIENTS_PER_PHYSICIAN_BASE); small-panel grids lower this floor.
+        import src.synthetic_generator as _sg
+        _sg.MIN_PATIENTS_PER_PHYSICIAN_BASE = int(cfg["min_patients_per_physician"])
     run_id = str(cfg.get("run_id", "run"))
     out_dir = Path(cfg.get("output_dir", "results")) / run_id
     if args.merge:
