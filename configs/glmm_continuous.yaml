@@ -1,0 +1,35 @@
+# GLMM specifications on the continuous-heterogeneity replicates (R2 comment 7).
+# In the five-group designs, Spearman correlations saturate at 0.981 (tied
+# groups), so the specifications cannot be told apart there. This run applies
+# them to the same 200 cohorts as the main run (same seeds as the continuous
+# family of configs/benchmark.yaml), where physician ranking is informative.
+#
+#   python -m src.benchmark.runner --config configs/glmm_continuous.yaml --workers 4
+
+run_id: "revision_glmm_continuous"
+output_dir: "results"
+seed: 42
+k_folds: 5
+caliper_percentile: 25.0
+threshold_strategy: "target_joint"
+covariate_model: "literature"
+hba1c_law: "lognormal"
+
+genetic:
+  enabled: false
+glmm_variants:
+  enabled: true
+glmm_diagnostics:
+  enabled: false
+
+families:
+  continuous:
+    enabled: true
+    n_patients: 20000
+    n_physicians: 50
+    seed: 442                        # identical to configs/benchmark.yaml: same cohorts
+    n_replicates: 200
+    designs: [in_sample]
+    cross_fitting_replicates: 10
+    cross_fitting_designs: [kfold]
+    methods: [glmm, glmm_oracle, glmm_interactions, glmm_splines, gbm_offset]
