@@ -71,7 +71,8 @@ def load(run_dir: Path) -> pd.DataFrame:
     path = Path(run_dir) / "benchmark_long.csv.gz"
     df = pd.read_csv(path, low_memory=False)
     for col, default in (("caliper_percentile", MAIN_CALIPER), ("D_star_intrinsic", np.nan),
-                         ("latent_gamma", np.nan), ("covariate_model", "literature")):
+                         ("latent_gamma", np.nan), ("covariate_model", "literature"),
+                         ("threshold_log_sd", np.nan), ("threshold_multiplier", 1.0)):
         if col not in df.columns:
             df[col] = default
     LOGGER.info("Loaded %d rows from %s", len(df), path)
@@ -123,7 +124,8 @@ def experiment_metrics(df: pd.DataFrame, reference: str = "D_tilde",
     keys = EXPERIMENT_KEYS + ["method", "supervised", "design", "computed_as", "caliper_percentile", "score_type"]
     first_cols = ["window_size", "pass_index", "realised_eligibility", "n_binary_rule_variables",
                   "n_patients_cohort", "n_physicians",
-                  "latent_gamma", "replicate", "covariate_model", "hba1c_law", "calibration_attainable"]
+                  "latent_gamma", "threshold_log_sd", "replicate", "covariate_model", "hba1c_law",
+                  "calibration_attainable"]
     rows = []
     for key, g in df.groupby(keys, dropna=False, sort=False):
         rec = dict(zip(keys, key))
@@ -438,6 +440,50 @@ def latent_table(df: pd.DataFrame) -> pd.DataFrame:
     return _order_methods(pd.DataFrame(out))
 
 
+def physician_thresholds_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Scenario E2: physician-specific SCORE2 thresholds (truth within each physician's own stratum).
+
+    Experiment-level metrics against D_tilde (calibration) and D_star (rank),
+    summarised over replicates for each threshold spread (SD of log k_j), the
+    paired change with the common-threshold cohort of the same replicate
+    (spread 0), and the error decomposition (comparability vs estimation).
+    """
+    d = df[df["family"] == "physician_thresholds"]
+    out: dict[str, pd.DataFrame] = {}
+    if d.empty:
+        return out
+    main = main_caliper(d)
+    exp = experiment_metrics(main, "D_tilde")
+    out["E2_experiment_metrics"] = exp
+    metrics = ["bias", "mae", "calibration_slope", "spearman", "kendall", "frac_pairs_mixed", "retention"]
+    out["E2_summary"] = monte_carlo_summary(exp, metrics, by=["threshold_log_sd", "design"])
+    base = exp[exp["threshold_log_sd"] == 0].set_index(["replicate", "method", "design"])
+    if not base.empty:
+        cols = ["bias", "mae", "calibration_slope", "spearman", "frac_pairs_mixed"]
+        j = exp[exp["threshold_log_sd"] > 0].join(base[cols], on=["replicate", "method", "design"], rsuffix="_sd0")
+        for c in cols:
+            j[f"{c}_change"] = j[c] - j[f"{c}_sd0"]
+        out["E2_change_vs_common_thresholds"] = monte_carlo_summary(
+            j, [f"{c}_change" for c in cols], by=["threshold_log_sd", "design"])
+    dec = decomposition(d)
+    if not dec.empty:
+        sd = d.drop_duplicates("experiment_id").set_index("experiment_id")["threshold_log_sd"]
+        dec = dec.join(sd, on="experiment_id")
+        out["E2_decomposition"] = monte_carlo_summary(
+            dec, ["total_bias", "comparability_bias", "estimation_bias", "total_mae", "comparability_mae",
+                  "estimation_mae"], by=["threshold_log_sd"])
+    phys = d.drop_duplicates(["experiment_id", "physician"])
+    out["E2_eligibility"] = phys.assign(eligible_share=phys["n_eligible"] / phys["n_patients"]).groupby(
+        "threshold_log_sd").agg(n_physician_panels=("physician", "size"),
+                                multiplier_min=("threshold_multiplier", "min"),
+                                multiplier_max=("threshold_multiplier", "max"),
+                                eligible_share_min=("eligible_share", "min"),
+                                eligible_share_median=("eligible_share", "median"),
+                                eligible_share_max=("eligible_share", "max"),
+                                n_eligible_min=("n_eligible", "min")).reset_index()
+    return out
+
+
 # -----------------------------------------------------------------------------
 # Orchestration
 # -----------------------------------------------------------------------------
@@ -557,10 +603,26 @@ def grid_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     return out
 
 
+def model_only_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Runs with model-based scores only (e.g. GLMM specifications on continuous heterogeneity)."""
+    exp = experiment_metrics(df, "D_star")
+    out = {"experiment_metrics_vs_D_star": exp}
+    for fam, g in exp.groupby("family"):
+        out[f"glmm_specifications_{fam}"] = monte_carlo_summary(g, ["spearman", "kendall"], by=["design"])
+        out[f"glmm_specifications_{fam}_paired"] = pd.concat(
+            [paired_method_differences(h, "spearman", monte_carlo=True).assign(design=d)
+             for d, h in g.groupby("design")], ignore_index=True)
+    return out
+
+
 def build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     tables: dict[str, pd.DataFrame] = {}
     if df["family"].isin(GRID_FAMILIES).all():
         return grid_tables(df)
+    if (df["family"] == "physician_thresholds").all():
+        return physician_thresholds_tables(df)
+    if (df["score_type"] != "discordance").all():
+        return model_only_tables(df)
     main = main_caliper(df)
     exp_tilde = experiment_metrics(main, "D_tilde")
     exp_star = experiment_metrics(main, "D_star")
@@ -602,6 +664,15 @@ def build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     tables["caliper_sensitivity"] = caliper_sensitivity(df)
     tables["runtime"] = runtime_table(exp_tilde)
     tables["glmm_specifications"] = glmm_specifications(exp_tilde)
+    cont_models = exp_star[(exp_star["family"] == "continuous") & exp_star["method"].isin(MODEL_METHODS)]
+    if cont_models["method"].nunique() > 1:
+        # Continuous heterogeneity: Monte Carlo distribution over replicates and
+        # paired differences between specifications (same cohorts).
+        tables["glmm_specifications_continuous"] = monte_carlo_summary(
+            cont_models, ["spearman", "kendall"], by=["design"])
+        tables["glmm_specifications_continuous_paired"] = pd.concat(
+            [paired_method_differences(g, "spearman", monte_carlo=True).assign(design=d)
+             for d, g in cont_models.groupby("design")], ignore_index=True)
     cont = exp_star[(exp_star["family"] == "continuous")]
     if not cont.empty:
         tables["continuous_monte_carlo"] = monte_carlo_summary(

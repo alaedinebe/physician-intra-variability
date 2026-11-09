@@ -8,3 +8,4 @@ scipy==1.14.0
 seaborn==0.13.2
 statsmodels==0.14.2
 patsy==1.0.3                 # used directly by the GLMM specifications
+pytest==9.1.1               # unit tests (python -m pytest)

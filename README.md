@@ -110,6 +110,15 @@ The file `configs/article_stats.yaml` groups:
 - synthetic generation parameters;
 - analysis pipeline configuration (GLMM, caliper, LPA, fixed effects).
 
+## Tests
+
+Unit tests cover the data generator (physician model, covariate model, eligibility rules and threshold calibration, closed-form truths of the unobserved-determinant scenario), the distances and the pairing algorithm (one-to-one pairing, caliper, matching with replacement, cancellation of the weights in the original Genetic Mahalanobis variant), the training designs (folds, cross-fitting without leakage, leave-one-physician-out, oracle strata), the GLMM and its variants (Pearson-residual score, calibration diagnostics) and the metrics (reference discordance, bias, MAE, calibration slope, Spearman correlation, error decomposition, code fingerprint).
+
+```bash
+pip install -r requirements.txt
+python -m pytest            # about 15 seconds
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

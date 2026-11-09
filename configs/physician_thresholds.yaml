@@ -1,0 +1,50 @@
+# Scenario E2 (revision, P. Meneton): physician-specific eligibility thresholds.
+#
+#   python -m src.benchmark.runner --config configs/physician_thresholds.yaml --list
+#   python -m src.benchmark.runner --config configs/physician_thresholds.yaml --smoke
+#   python -m src.benchmark.runner --config configs/physician_thresholds.yaml --workers 12
+#   python -m src.benchmark.metrics --run results/revision_physician_thresholds
+#   python scripts/physician_thresholds_report.py
+#
+# Each physician j applies the SCORE2 rule (Equation 3) with its own thresholds
+# k_j x (2.5, 5, 7.5)%, k_j = exp(sigma z_j), z_j ~ N(0, 1). D* and D_tilde are
+# defined within each physician's own eligible stratum. Everything else is the
+# SCORE2 reference experiment of configs/benchmark.yaml (five groups, 10,000
+# patients, 20 physicians, literature covariates, caliper P25, all designs).
+# sigma = 0 reproduces the reference cohort exactly (common random numbers
+# within a replicate: same patients, same z_j, same outcome stream).
+
+run_id: "revision_physician_thresholds"
+output_dir: "results"
+seed: 42
+k_folds: 5
+caliper_percentile: 25.0
+threshold_strategy: "target_joint"
+covariate_model: "literature"
+hba1c_law: "lognormal"
+
+genetic:
+  enabled: true
+  variant: "genmatch"
+  also_run_variants: []              # the original variant is not needed here
+  workers: 2                         # 'deferred' updating as in the main run; 6 runner workers x 2 cores
+
+glmm_variants:
+  enabled: true                      # oracle GLMM uses the physician-specific eligibility
+
+glmm_diagnostics:
+  enabled: false
+
+method_rules:
+  genetic_mahalanobis:
+    exclude_designs: ["lopo"]        # as in the main run
+
+families:
+  physician_thresholds:
+    enabled: true
+    n_patients: 10000
+    n_physicians: 20
+    seed: 642
+    threshold_log_sds: [0, 0.1, 0.2] # 0 = common thresholds (reference); 0.3 leaves < 30 eligible patients in some panels
+    n_replicates: 4
+    designs: [in_sample, fold_restricted, kfold, lopo, external, oracle_eligible, oracle_ineligible]

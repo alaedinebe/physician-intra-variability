@@ -1568,6 +1568,8 @@ def apply_recorded_rule(df: pd.DataFrame, metadata: dict[str, Any]) -> np.ndarra
     Thresholds are taken as recorded (not recalibrated), so a development
     cohort receives exactly the same rule as the benchmark cohort.
     """
+    if metadata.get("rule_type") == PHYSICIAN_THRESHOLDS_STRATEGY:
+        return physician_specific_score2_mask(df, metadata["threshold_multipliers"])
     if metadata.get("rule_type") == "score2" or not metadata.get("variables"):
         return _calculate_score2_moderate_or_high_vectorized(df).to_numpy(dtype=bool)
     binary = set(metadata.get("binary_variables") or [])
@@ -1674,3 +1676,92 @@ def generate_score2_latent_influence(
     df["generation_rule_mask"] = eligible
     df["recommendation"] = np.random.default_rng(random_state + 40).binomial(1, prob).astype(np.int32)
     return df, params
+
+
+# -----------------------------------------------------------------------------
+# Scenario E2: physician-specific eligibility thresholds (revision, P. Meneton)
+# -----------------------------------------------------------------------------
+PHYSICIAN_THRESHOLDS_STRATEGY = "score2_physician_thresholds"
+SCORE2_AGE_BAND_THRESHOLDS_PCT = (2.5, 5.0, 7.5)   # age < 50, 50-69, > 69 (Equation 3)
+PHYSICIAN_THRESHOLD_SEED_OFFSET = 70
+
+
+def physician_threshold_multipliers(
+    professionals: list[str], threshold_log_sd: float, random_state: int,
+) -> dict[str, float]:
+    """Multiplier k_j = exp(sigma z_j), z_j ~ N(0, 1) iid, applied to the three SCORE2 risk thresholds.
+
+    The standard normal draws depend only on ``random_state``, so that
+    experiments differing only by ``threshold_log_sd`` share the same z_j
+    (common random numbers); ``threshold_log_sd = 0`` gives k_j = 1 for all.
+    """
+    if threshold_log_sd < 0:
+        raise ValueError(f"threshold_log_sd must be >= 0; got {threshold_log_sd!r}.")
+    z = np.random.default_rng(random_state + PHYSICIAN_THRESHOLD_SEED_OFFSET).standard_normal(len(professionals))
+    return {pid: float(np.exp(threshold_log_sd * zj)) for pid, zj in zip(professionals, z)}
+
+
+def physician_specific_score2_mask(df: pd.DataFrame, multipliers: dict[str, float]) -> np.ndarray:
+    """SCORE2 eligibility (Equation 3) with the age-band thresholds of each patient's physician.
+
+    Patient i of physician j is eligible when risk_i >= k_j t_a(i), with t_a the
+    ESC 2021 threshold of the patient's age band. k_j = 1 reproduces
+    ``_calculate_score2_moderate_or_high_vectorized`` exactly.
+    """
+    risk = score2_ten_year_risk_percent_vectorized(df, risk_region=SCORE2_DEFAULT_RISK_REGION)
+    age = df["age"].to_numpy(dtype=float)
+    phys = df["professional_id"].astype(str)
+    missing = set(phys.unique()) - set(multipliers)
+    if missing:
+        raise ValueError(f"No threshold multiplier for physicians {sorted(missing)[:5]}.")
+    k = phys.map(multipliers).to_numpy(dtype=float)
+    t_young, t_mid, t_old = SCORE2_AGE_BAND_THRESHOLDS_PCT
+    young = age < 50.0
+    mid = (age >= 50.0) & (age <= 69.0)
+    old = age > 69.0
+    return ((young & (risk >= t_young * k)) | (mid & (risk >= t_mid * k)) | (old & (risk >= t_old * k)))
+
+
+def generate_score2_physician_thresholds(
+    n_patients: int = SCORE2_FIVE_GROUPS_DEFAULT_N_PATIENTS,
+    expected_n_pros: int = SCORE2_FIVE_GROUPS_DEFAULT_N_PHYSICIANS,
+    random_state: int = 42,
+    threshold_log_sd: float = 0.25,
+    covariate_model: str = COVARIATE_MODEL_DEFAULT,
+    hba1c_law: str = HBA1C_LAW_DEFAULT,
+    pairwise_correlation: tuple[str, str, float] | None = None,
+) -> tuple[pd.DataFrame, dict[str, dict[str, float]], dict[str, float]]:
+    """SCORE2 five-group cohort in which each physician applies its own thresholds.
+
+    Covariates, physician allocation, prescribing probabilities (Table 4) and
+    the outcome random stream are those of
+    ``generate_score2_five_groups_heter_patients`` with the same seed; only the
+    eligibility rule differs: physician j uses the thresholds k_j (2.5, 5, 7.5)%
+    (``physician_threshold_multipliers``). The ground truth is defined within
+    each physician's own eligible stratum: ``generation_rule_mask`` holds the
+    physician-specific eligibility, D* = 2 p_high (1 - p_high) is unchanged and
+    D_tilde is computed over the pairs of the physician's eligible patients.
+    With ``threshold_log_sd = 0`` the cohort equals the reference experiment.
+
+    Returns the frame, the physician parameters (with ``threshold_multiplier``)
+    and the multipliers.
+    """
+    df = generate_score2_five_groups_heter_patients(
+        n_patients=n_patients, expected_n_pros=expected_n_pros, random_state=random_state,
+        pairwise_correlation=pairwise_correlation, hba1c_law=hba1c_law, covariate_model=covariate_model,
+    )
+    params = five_group_physician_parameters(expected_n_pros)
+    multipliers = physician_threshold_multipliers(list(params), float(threshold_log_sd), random_state)
+    eligible = physician_specific_score2_mask(df, multipliers)
+    phys = df["professional_id"].astype(str).to_numpy()
+    p_high = np.array([params[p]["p_high"] for p in phys])
+    p_low = np.array([params[p]["p_low"] for p in phys])
+    # Same random stream as the reference experiment (seed + 40), so that sd = 0 reproduces it.
+    rng = np.random.default_rng(random_state + 40)
+    y = rng.binomial(1, np.where(eligible, p_high, p_low)).astype(np.int32)
+    df["outcome_score2_five_groups_heter_patients"] = y
+    df["recommendation"] = y
+    df["generation_rule_mask"] = eligible
+    for pid, par in params.items():
+        par["threshold_multiplier"] = multipliers[pid]
+    return df, params, multipliers

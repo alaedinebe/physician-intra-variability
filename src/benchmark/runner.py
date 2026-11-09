@@ -70,6 +70,7 @@ from src.synthetic_generator import (
     generate_score2_continuous_heterogeneity,
     generate_score2_five_groups_heter_patients,
     generate_score2_latent_influence,
+    generate_score2_physician_thresholds,
     get_generation_rule_mask,
 )
 
@@ -97,10 +98,11 @@ OUTPUT_COLUMNS = {
     # experiment
     "run_id": "Identifier of the run (configuration name).",
     "experiment_id": "Unique experiment identifier.",
-    "family": "score2 | progressive | sensitivity_independent | sensitivity_diabetes_hba1c | latent | continuous.",
+    "family": "score2 | progressive | sensitivity_independent | sensitivity_diabetes_hba1c | latent | continuous | physician_thresholds.",
     "replicate": "Replicate index (Monte Carlo replications of a family).",
     "seed": "Master seed of the experiment.",
     "latent_gamma": "Scenario E1: influence of the unobserved determinant U (NaN elsewhere).",
+    "threshold_log_sd": "Scenario E2: SD of log k_j, the physician-specific threshold multiplier (NaN elsewhere).",
     "pass_index": "Progressive rules: pass (1 or 2); 0 otherwise.",
     "window_size": "Progressive rules: number of covariates in the rule; 0 for SCORE2.",
     "window_start": "Progressive rules: position of the window in the covariate list.",
@@ -119,6 +121,7 @@ OUTPUT_COLUMNS = {
     # physician truth
     "physician": "Physician identifier.",
     "physician_group": "Five-group design: group 1 to 5; empty for continuous heterogeneity.",
+    "threshold_multiplier": "Scenario E2: multiplier k_j of the physician's SCORE2 thresholds (1 elsewhere).",
     "p_high": "Prescribing probability for eligible patients.",
     "p_low": "Prescribing probability for ineligible patients.",
     "n_patients": "Patients of the physician.",
@@ -186,6 +189,7 @@ class ExperimentSpec:
     caliper_sensitivity: list[Optional[float]] = field(default_factory=list)
     caliper_sensitivity_designs: list[str] = field(default_factory=list)
     latent_gamma: Optional[float] = None
+    threshold_log_sd: Optional[float] = None
 
 
 @dataclass
@@ -225,6 +229,15 @@ def generate_experiment(spec: ExperimentSpec, threshold_strategy: str) -> Genera
         )
         eligible = df["generation_rule_mask"].to_numpy(dtype=bool)
         meta = {"rule_type": "score2", "variables": []}
+    elif spec.family == "physician_thresholds":
+        df, params, multipliers = generate_score2_physician_thresholds(
+            n_patients=spec.n_patients, expected_n_pros=spec.n_physicians, random_state=spec.seed,
+            threshold_log_sd=float(spec.threshold_log_sd), covariate_model=spec.covariate_model,
+            hba1c_law=spec.hba1c_law, pairwise_correlation=spec.covariate_correlation,
+        )
+        eligible = df["generation_rule_mask"].to_numpy(dtype=bool)
+        meta = {"rule_type": "score2_physician_thresholds", "variables": [],
+                "threshold_log_sd": float(spec.threshold_log_sd), "threshold_multipliers": multipliers}
     elif spec.family in CONTINUOUS_FAMILIES:
         df, raw_params, _ = generate_score2_continuous_heterogeneity(
             n_patients=spec.n_patients, expected_n_pros=spec.n_physicians, random_state=spec.seed,
@@ -336,6 +349,18 @@ def build_plan(cfg: dict[str, Any]) -> list[ExperimentSpec]:
                                             hba1c_law=default_hba1c, covariate_model=default_model,
                                             latent_gamma=float(g), designs=_designs(b), methods=b.get("methods")))
 
+    if fam.get("physician_thresholds", {}).get("enabled", False):
+        # E2: physician-specific SCORE2 thresholds; same cohort (seed) across spreads within a replicate.
+        b = fam["physician_thresholds"]
+        for r in range(int(b.get("n_replicates", 1))):
+            for sd in b["threshold_log_sds"]:
+                specs.append(ExperimentSpec(f"physthr_sd{float(sd):g}_r{r:02d}", "physician_thresholds",
+                                            int(b.get("seed", base_seed + 600)) + 1_000 * r,
+                                            int(b["n_patients"]), int(b["n_physicians"]), replicate=r,
+                                            hba1c_law=default_hba1c, covariate_model=default_model,
+                                            threshold_log_sd=float(sd), designs=_designs(b),
+                                            methods=b.get("methods"), **_caliper_sensitivity(b)))
+
     if fam.get("continuous", {}).get("enabled", False):
         b = fam["continuous"]
         n_cf = int(b.get("cross_fitting_replicates", 0))
@@ -400,6 +425,7 @@ def physician_truth(exp: GeneratedExperiment) -> pd.DataFrame:
         rows.append({
             "physician": p,
             "physician_group": par.get("group"),
+            "threshold_multiplier": par.get("threshold_multiplier", 1.0),
             "p_high": par["p_high"],
             "p_low": par["p_low"],
             "n_patients": int(sel.sum()),
@@ -447,6 +473,7 @@ def _experiment_columns(exp: GeneratedExperiment, run_id: str, threshold_strateg
     return {
         "run_id": run_id, "experiment_id": s.experiment_id, "family": s.family, "replicate": s.replicate,
         "seed": s.seed, "latent_gamma": float("nan") if s.latent_gamma is None else s.latent_gamma,
+        "threshold_log_sd": float("nan") if s.threshold_log_sd is None else s.threshold_log_sd,
         "pass_index": int((s.rule or {}).get("pass_index", 0)),
         "window_size": int((s.rule or {}).get("window_size", 0)),
         "window_start": int((s.rule or {}).get("window_start", 0)),
@@ -699,7 +726,7 @@ def apply_smoke(cfg: dict[str, Any]) -> dict[str, Any]:
             block.update(n_patients=[1_000, 2_000], n_physicians=[5, 20], n_replicates=1)
             continue
         block["n_patients"] = min(int(block["n_patients"]), 2_000 if name != "continuous" else 2_500)
-        if name == "continuous":
+        if name in ("continuous", "physician_thresholds"):
             block["n_replicates"] = min(int(block.get("n_replicates", 1)), 1)
     if "progressive" in cfg["families"]:
         cfg["families"]["progressive"]["max_experiments"] = int(cfg["families"]["progressive"].get("max_experiments", 4))
