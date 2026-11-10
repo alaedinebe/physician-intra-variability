@@ -1,0 +1,4 @@
+threshold_log_sd,n_physician_panels,multiplier_min,multiplier_max,eligible_share_min,eligible_share_median,eligible_share_max,n_eligible_min
+0,80,1,1,0.382664,0.42629,0.463415,181
+0.1,80,0.781533,1.32754,0.22158,0.423652,0.59381,115
+0.2,80,0.610793,1.76237,0.088632,0.424314,0.760649,46

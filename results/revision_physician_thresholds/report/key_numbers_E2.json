@@ -1,0 +1,702 @@
+{
+ "n_replicates": 4,
+ "threshold_log_sds": [
+  0.0,
+  0.1,
+  0.2
+ ],
+ "eligibility": [
+  {
+   "threshold_log_sd": 0.0,
+   "n_physician_panels": 80,
+   "multiplier_min": 1.0,
+   "multiplier_max": 1.0,
+   "eligible_share_min": 0.3827,
+   "eligible_share_median": 0.4263,
+   "eligible_share_max": 0.4634,
+   "n_eligible_min": 181
+  },
+  {
+   "threshold_log_sd": 0.1,
+   "n_physician_panels": 80,
+   "multiplier_min": 0.7815,
+   "multiplier_max": 1.3275,
+   "eligible_share_min": 0.2216,
+   "eligible_share_median": 0.4237,
+   "eligible_share_max": 0.5938,
+   "n_eligible_min": 115
+  },
+  {
+   "threshold_log_sd": 0.2,
+   "n_physician_panels": 80,
+   "multiplier_min": 0.6108,
+   "multiplier_max": 1.7624,
+   "eligible_share_min": 0.0886,
+   "eligible_share_median": 0.4243,
+   "eligible_share_max": 0.7606,
+   "n_eligible_min": 46
+  }
+ ],
+ "decomposition_median": {
+  "euclidean|sd=0.1|total_bias": 0.0524,
+  "euclidean|sd=0.1|comparability_bias": 0.0532,
+  "euclidean|sd=0.1|estimation_bias": -0.0006,
+  "euclidean|sd=0.2|total_bias": 0.0536,
+  "euclidean|sd=0.2|comparability_bias": 0.0476,
+  "euclidean|sd=0.2|estimation_bias": 0.002,
+  "euclidean|sd=0|total_bias": 0.0565,
+  "euclidean|sd=0|comparability_bias": 0.0524,
+  "euclidean|sd=0|estimation_bias": 0.0026,
+  "mahalanobis|sd=0.1|total_bias": 0.0602,
+  "mahalanobis|sd=0.1|comparability_bias": 0.0606,
+  "mahalanobis|sd=0.1|estimation_bias": -0.0003,
+  "mahalanobis|sd=0.2|total_bias": 0.0595,
+  "mahalanobis|sd=0.2|comparability_bias": 0.0571,
+  "mahalanobis|sd=0.2|estimation_bias": 0.0026,
+  "mahalanobis|sd=0|total_bias": 0.0627,
+  "mahalanobis|sd=0|comparability_bias": 0.0659,
+  "mahalanobis|sd=0|estimation_bias": -0.007,
+  "lpa_guided|sd=0.1|total_bias": 0.0674,
+  "lpa_guided|sd=0.1|comparability_bias": 0.069,
+  "lpa_guided|sd=0.1|estimation_bias": -0.0039,
+  "lpa_guided|sd=0.2|total_bias": 0.0633,
+  "lpa_guided|sd=0.2|comparability_bias": 0.0544,
+  "lpa_guided|sd=0.2|estimation_bias": 0.007,
+  "lpa_guided|sd=0|total_bias": 0.0714,
+  "lpa_guided|sd=0|comparability_bias": 0.0754,
+  "lpa_guided|sd=0|estimation_bias": -0.004,
+  "genetic_mahalanobis|sd=0.1|total_bias": 0.0362,
+  "genetic_mahalanobis|sd=0.1|comparability_bias": 0.0357,
+  "genetic_mahalanobis|sd=0.1|estimation_bias": 0.0025,
+  "genetic_mahalanobis|sd=0.2|total_bias": 0.038,
+  "genetic_mahalanobis|sd=0.2|comparability_bias": 0.0423,
+  "genetic_mahalanobis|sd=0.2|estimation_bias": 0.0021,
+  "genetic_mahalanobis|sd=0|total_bias": 0.0332,
+  "genetic_mahalanobis|sd=0|comparability_bias": 0.038,
+  "genetic_mahalanobis|sd=0|estimation_bias": -0.0007,
+  "learned_weights|sd=0.1|total_bias": 0.0188,
+  "learned_weights|sd=0.1|comparability_bias": 0.0236,
+  "learned_weights|sd=0.1|estimation_bias": -0.0012,
+  "learned_weights|sd=0.2|total_bias": 0.0207,
+  "learned_weights|sd=0.2|comparability_bias": 0.0314,
+  "learned_weights|sd=0.2|estimation_bias": -0.0055,
+  "learned_weights|sd=0|total_bias": 0.0239,
+  "learned_weights|sd=0|comparability_bias": 0.0261,
+  "learned_weights|sd=0|estimation_bias": 0.0009,
+  "mutual_information|sd=0.1|total_bias": 0.032,
+  "mutual_information|sd=0.1|comparability_bias": 0.0324,
+  "mutual_information|sd=0.1|estimation_bias": -0.0005,
+  "mutual_information|sd=0.2|total_bias": 0.028,
+  "mutual_information|sd=0.2|comparability_bias": 0.0403,
+  "mutual_information|sd=0.2|estimation_bias": -0.0113,
+  "mutual_information|sd=0|total_bias": 0.0313,
+  "mutual_information|sd=0|comparability_bias": 0.033,
+  "mutual_information|sd=0|estimation_bias": -0.006,
+  "rf_proximity|sd=0.1|total_bias": 0.02,
+  "rf_proximity|sd=0.1|comparability_bias": 0.0274,
+  "rf_proximity|sd=0.1|estimation_bias": -0.0066,
+  "rf_proximity|sd=0.2|total_bias": 0.0266,
+  "rf_proximity|sd=0.2|comparability_bias": 0.029,
+  "rf_proximity|sd=0.2|estimation_bias": -0.0006,
+  "rf_proximity|sd=0|total_bias": 0.0226,
+  "rf_proximity|sd=0|comparability_bias": 0.0283,
+  "rf_proximity|sd=0|estimation_bias": -0.0028
+ },
+ "bias_median_by_sd": {
+  "euclidean|sd=0": 0.0546,
+  "euclidean|sd=0.1": 0.0526,
+  "euclidean|sd=0.2": 0.0518,
+  "mahalanobis|sd=0": 0.0622,
+  "mahalanobis|sd=0.1": 0.0609,
+  "mahalanobis|sd=0.2": 0.0618,
+  "lpa_guided|sd=0": 0.0708,
+  "lpa_guided|sd=0.1": 0.0668,
+  "lpa_guided|sd=0.2": 0.0646,
+  "genetic_mahalanobis|sd=0": 0.0337,
+  "genetic_mahalanobis|sd=0.1": 0.0368,
+  "genetic_mahalanobis|sd=0.2": 0.0403,
+  "learned_weights|sd=0": 0.0237,
+  "learned_weights|sd=0.1": 0.0194,
+  "learned_weights|sd=0.2": 0.023,
+  "mutual_information|sd=0": 0.0328,
+  "mutual_information|sd=0.1": 0.0326,
+  "mutual_information|sd=0.2": 0.0293,
+  "rf_proximity|sd=0": 0.0233,
+  "rf_proximity|sd=0.1": 0.0223,
+  "rf_proximity|sd=0.2": 0.0279
+ },
+ "mae_median_by_sd": {
+  "euclidean|sd=0": 0.0747,
+  "euclidean|sd=0.1": 0.0743,
+  "euclidean|sd=0.2": 0.0713,
+  "mahalanobis|sd=0": 0.0817,
+  "mahalanobis|sd=0.1": 0.0819,
+  "mahalanobis|sd=0.2": 0.0814,
+  "lpa_guided|sd=0": 0.0824,
+  "lpa_guided|sd=0.1": 0.0852,
+  "lpa_guided|sd=0.2": 0.083,
+  "genetic_mahalanobis|sd=0": 0.0588,
+  "genetic_mahalanobis|sd=0.1": 0.0656,
+  "genetic_mahalanobis|sd=0.2": 0.0593,
+  "learned_weights|sd=0": 0.0491,
+  "learned_weights|sd=0.1": 0.0532,
+  "learned_weights|sd=0.2": 0.057,
+  "mutual_information|sd=0": 0.0573,
+  "mutual_information|sd=0.1": 0.062,
+  "mutual_information|sd=0.2": 0.0557,
+  "rf_proximity|sd=0": 0.0566,
+  "rf_proximity|sd=0.1": 0.0594,
+  "rf_proximity|sd=0.2": 0.057
+ },
+ "spearman_median_by_sd": {
+  "euclidean|sd=0": 0.9688,
+  "euclidean|sd=0.1": 0.9657,
+  "euclidean|sd=0.2": 0.9657,
+  "mahalanobis|sd=0": 0.9626,
+  "mahalanobis|sd=0.1": 0.9596,
+  "mahalanobis|sd=0.2": 0.9534,
+  "lpa_guided|sd=0": 0.9596,
+  "lpa_guided|sd=0.1": 0.9412,
+  "lpa_guided|sd=0.2": 0.9597,
+  "genetic_mahalanobis|sd=0": 0.9688,
+  "genetic_mahalanobis|sd=0.1": 0.978,
+  "genetic_mahalanobis|sd=0.2": 0.981,
+  "learned_weights|sd=0": 0.978,
+  "learned_weights|sd=0.1": 0.981,
+  "learned_weights|sd=0.2": 0.981,
+  "mutual_information|sd=0": 0.9718,
+  "mutual_information|sd=0.1": 0.978,
+  "mutual_information|sd=0.2": 0.9657,
+  "rf_proximity|sd=0": 0.981,
+  "rf_proximity|sd=0.1": 0.9659,
+  "rf_proximity|sd=0.2": 0.981,
+  "glmm|sd=0": 0.981,
+  "glmm|sd=0.1": 0.981,
+  "glmm|sd=0.2": 0.978,
+  "gbm_offset|sd=0": 0.981,
+  "gbm_offset|sd=0.1": 0.981,
+  "gbm_offset|sd=0.2": 0.981
+ },
+ "oracle_bias_median_by_sd": {
+  "euclidean|sd=0": 0.0023,
+  "euclidean|sd=0.1": 0.0006,
+  "euclidean|sd=0.2": 0.0033,
+  "mahalanobis|sd=0": -0.0063,
+  "mahalanobis|sd=0.1": -0.0047,
+  "mahalanobis|sd=0.2": 0.001,
+  "lpa_guided|sd=0": -0.0033,
+  "lpa_guided|sd=0.1": -0.0014,
+  "lpa_guided|sd=0.2": 0.0054,
+  "genetic_mahalanobis|sd=0": 0.0008,
+  "genetic_mahalanobis|sd=0.1": -0.0029,
+  "genetic_mahalanobis|sd=0.2": 0.0005,
+  "learned_weights|sd=0": 0.0017,
+  "learned_weights|sd=0.1": -0.0042,
+  "learned_weights|sd=0.2": -0.0042,
+  "mutual_information|sd=0": -0.0046,
+  "mutual_information|sd=0.1": -0.0014,
+  "mutual_information|sd=0.2": -0.009,
+  "rf_proximity|sd=0": -0.0039,
+  "rf_proximity|sd=0.1": -0.0053,
+  "rf_proximity|sd=0.2": -0.0007
+ },
+ "mixed_median_by_sd": {
+  "euclidean|sd=0": 0.196,
+  "euclidean|sd=0.1": 0.1918,
+  "euclidean|sd=0.2": 0.1739,
+  "mahalanobis|sd=0": 0.208,
+  "mahalanobis|sd=0.1": 0.2036,
+  "mahalanobis|sd=0.2": 0.1852,
+  "lpa_guided|sd=0": 0.2145,
+  "lpa_guided|sd=0.1": 0.2099,
+  "lpa_guided|sd=0.2": 0.1955,
+  "genetic_mahalanobis|sd=0": 0.1513,
+  "genetic_mahalanobis|sd=0.1": 0.1568,
+  "genetic_mahalanobis|sd=0.2": 0.1413,
+  "learned_weights|sd=0": 0.1278,
+  "learned_weights|sd=0.1": 0.1234,
+  "learned_weights|sd=0.2": 0.1173,
+  "mutual_information|sd=0": 0.1394,
+  "mutual_information|sd=0.1": 0.1374,
+  "mutual_information|sd=0.2": 0.1312,
+  "rf_proximity|sd=0": 0.133,
+  "rf_proximity|sd=0.1": 0.1342,
+  "rf_proximity|sd=0.2": 0.1298
+ },
+ "change_vs_sd0_median": {
+  "euclidean|sd=0.1|bias_change": -0.0021,
+  "euclidean|sd=0.1|mae_change": 0.0001,
+  "euclidean|sd=0.1|calibration_slope_change": -0.0077,
+  "euclidean|sd=0.1|spearman_change": -0.0031,
+  "euclidean|sd=0.1|frac_pairs_mixed_change": -0.0033,
+  "euclidean|sd=0.2|bias_change": -0.0055,
+  "euclidean|sd=0.2|mae_change": -0.0039,
+  "euclidean|sd=0.2|calibration_slope_change": 0.0442,
+  "euclidean|sd=0.2|spearman_change": -0.0092,
+  "euclidean|sd=0.2|frac_pairs_mixed_change": -0.0208,
+  "mahalanobis|sd=0.1|bias_change": 0.0032,
+  "mahalanobis|sd=0.1|mae_change": -0.0008,
+  "mahalanobis|sd=0.1|calibration_slope_change": 0.0344,
+  "mahalanobis|sd=0.1|spearman_change": -0.0,
+  "mahalanobis|sd=0.1|frac_pairs_mixed_change": -0.0013,
+  "mahalanobis|sd=0.2|bias_change": -0.0023,
+  "mahalanobis|sd=0.2|mae_change": 0.0,
+  "mahalanobis|sd=0.2|calibration_slope_change": 0.0604,
+  "mahalanobis|sd=0.2|spearman_change": -0.0153,
+  "mahalanobis|sd=0.2|frac_pairs_mixed_change": -0.0183,
+  "lpa_guided|sd=0.1|bias_change": 0.0006,
+  "lpa_guided|sd=0.1|mae_change": 0.0004,
+  "lpa_guided|sd=0.1|calibration_slope_change": -0.0003,
+  "lpa_guided|sd=0.1|spearman_change": -0.0186,
+  "lpa_guided|sd=0.1|frac_pairs_mixed_change": -0.0047,
+  "lpa_guided|sd=0.2|bias_change": -0.0063,
+  "lpa_guided|sd=0.2|mae_change": -0.0023,
+  "lpa_guided|sd=0.2|calibration_slope_change": 0.0322,
+  "lpa_guided|sd=0.2|spearman_change": -0.0092,
+  "lpa_guided|sd=0.2|frac_pairs_mixed_change": -0.0218,
+  "genetic_mahalanobis|sd=0.1|bias_change": 0.0014,
+  "genetic_mahalanobis|sd=0.1|mae_change": 0.0068,
+  "genetic_mahalanobis|sd=0.1|calibration_slope_change": 0.0058,
+  "genetic_mahalanobis|sd=0.1|spearman_change": 0.0092,
+  "genetic_mahalanobis|sd=0.1|frac_pairs_mixed_change": 0.0053,
+  "genetic_mahalanobis|sd=0.2|bias_change": 0.0015,
+  "genetic_mahalanobis|sd=0.2|mae_change": 0.0004,
+  "genetic_mahalanobis|sd=0.2|calibration_slope_change": 0.0408,
+  "genetic_mahalanobis|sd=0.2|spearman_change": 0.0123,
+  "genetic_mahalanobis|sd=0.2|frac_pairs_mixed_change": -0.0102,
+  "learned_weights|sd=0.1|bias_change": 0.0006,
+  "learned_weights|sd=0.1|mae_change": 0.0067,
+  "learned_weights|sd=0.1|calibration_slope_change": 0.0044,
+  "learned_weights|sd=0.1|spearman_change": -0.0002,
+  "learned_weights|sd=0.1|frac_pairs_mixed_change": -0.0033,
+  "learned_weights|sd=0.2|bias_change": -0.005,
+  "learned_weights|sd=0.2|mae_change": 0.0078,
+  "learned_weights|sd=0.2|calibration_slope_change": -0.0027,
+  "learned_weights|sd=0.2|spearman_change": 0.0031,
+  "learned_weights|sd=0.2|frac_pairs_mixed_change": -0.0069,
+  "mutual_information|sd=0.1|bias_change": -0.0025,
+  "mutual_information|sd=0.1|mae_change": 0.0069,
+  "mutual_information|sd=0.1|calibration_slope_change": -0.0141,
+  "mutual_information|sd=0.1|spearman_change": -0.0002,
+  "mutual_information|sd=0.1|frac_pairs_mixed_change": -0.0006,
+  "mutual_information|sd=0.2|bias_change": -0.0002,
+  "mutual_information|sd=0.2|mae_change": 0.0009,
+  "mutual_information|sd=0.2|calibration_slope_change": 0.0023,
+  "mutual_information|sd=0.2|spearman_change": 0.0031,
+  "mutual_information|sd=0.2|frac_pairs_mixed_change": -0.0098,
+  "rf_proximity|sd=0.1|bias_change": 0.0001,
+  "rf_proximity|sd=0.1|mae_change": 0.0005,
+  "rf_proximity|sd=0.1|calibration_slope_change": -0.0117,
+  "rf_proximity|sd=0.1|spearman_change": -0.0151,
+  "rf_proximity|sd=0.1|frac_pairs_mixed_change": 0.0017,
+  "rf_proximity|sd=0.2|bias_change": 0.0023,
+  "rf_proximity|sd=0.2|mae_change": 0.0031,
+  "rf_proximity|sd=0.2|calibration_slope_change": -0.0003,
+  "rf_proximity|sd=0.2|spearman_change": 0.0,
+  "rf_proximity|sd=0.2|frac_pairs_mixed_change": -0.0063,
+  "glmm|sd=0.1|spearman_change": 0.0,
+  "glmm|sd=0.2|spearman_change": -0.0031,
+  "glmm_oracle|sd=0.1|spearman_change": 0.0,
+  "glmm_oracle|sd=0.2|spearman_change": 0.0,
+  "glmm_interactions|sd=0.1|spearman_change": -0.0092,
+  "glmm_interactions|sd=0.2|spearman_change": 0.0,
+  "glmm_splines|sd=0.1|spearman_change": 0.0,
+  "glmm_splines|sd=0.2|spearman_change": 0.0,
+  "gbm_offset|sd=0.1|spearman_change": 0.0,
+  "gbm_offset|sd=0.2|spearman_change": 0.0
+ },
+ "error_vs_epsilon": {
+  "euclidean|sd=0.1|signed": {
+   "slope": 0.0016,
+   "ci": [
+    -0.0095,
+    0.0127
+   ],
+   "replicates": [
+    -0.0009,
+    0.0031
+   ],
+   "n_rep_negative": 1,
+   "mean_change": -0.0033,
+   "r2": 0.0
+  },
+  "euclidean|sd=0.1|absolute": {
+   "slope": 0.0062,
+   "ci": [
+    -0.005,
+    0.0174
+   ],
+   "replicates": [
+    -0.0178,
+    0.0155
+   ],
+   "n_rep_negative": 1,
+   "mean_change": -0.0001,
+   "r2": 0.013
+  },
+  "genetic_mahalanobis|sd=0.1|signed": {
+   "slope": -0.0009,
+   "ci": [
+    -0.01,
+    0.0082
+   ],
+   "replicates": [
+    -0.009,
+    0.0045
+   ],
+   "n_rep_negative": 2,
+   "mean_change": -0.0025,
+   "r2": 0.001
+  },
+  "genetic_mahalanobis|sd=0.1|absolute": {
+   "slope": 0.0029,
+   "ci": [
+    -0.0074,
+    0.0131
+   ],
+   "replicates": [
+    -0.0042,
+    0.0104
+   ],
+   "n_rep_negative": 3,
+   "mean_change": 0.0055,
+   "r2": 0.002
+  },
+  "learned_weights|sd=0.1|signed": {
+   "slope": 0.0035,
+   "ci": [
+    -0.0055,
+    0.0125
+   ],
+   "replicates": [
+    -0.0044,
+    0.0144
+   ],
+   "n_rep_negative": 1,
+   "mean_change": -0.0049,
+   "r2": 0.005
+  },
+  "learned_weights|sd=0.1|absolute": {
+   "slope": 0.0062,
+   "ci": [
+    -0.0048,
+    0.0172
+   ],
+   "replicates": [
+    -0.0147,
+    0.0219
+   ],
+   "n_rep_negative": 2,
+   "mean_change": 0.0054,
+   "r2": 0.012
+  },
+  "lpa_guided|sd=0.1|signed": {
+   "slope": -0.0024,
+   "ci": [
+    -0.0145,
+    0.0098
+   ],
+   "replicates": [
+    -0.0119,
+    0.0049
+   ],
+   "n_rep_negative": 2,
+   "mean_change": -0.006,
+   "r2": 0.003
+  },
+  "lpa_guided|sd=0.1|absolute": {
+   "slope": 0.013,
+   "ci": [
+    0.0002,
+    0.0258
+   ],
+   "replicates": [
+    -0.0016,
+    0.0235
+   ],
+   "n_rep_negative": 1,
+   "mean_change": 0.0016,
+   "r2": 0.046
+  },
+  "mahalanobis|sd=0.1|signed": {
+   "slope": -0.0008,
+   "ci": [
+    -0.0114,
+    0.0098
+   ],
+   "replicates": [
+    -0.0123,
+    0.014
+   ],
+   "n_rep_negative": 2,
+   "mean_change": 0.0,
+   "r2": 0.002
+  },
+  "mahalanobis|sd=0.1|absolute": {
+   "slope": 0.0091,
+   "ci": [
+    -0.0026,
+    0.0207
+   ],
+   "replicates": [
+    -0.0133,
+    0.0194
+   ],
+   "n_rep_negative": 1,
+   "mean_change": -0.0021,
+   "r2": 0.029
+  },
+  "mutual_information|sd=0.1|signed": {
+   "slope": -0.0011,
+   "ci": [
+    -0.0109,
+    0.0088
+   ],
+   "replicates": [
+    -0.0202,
+    0.0095
+   ],
+   "n_rep_negative": 2,
+   "mean_change": -0.0018,
+   "r2": 0.002
+  },
+  "mutual_information|sd=0.1|absolute": {
+   "slope": 0.0041,
+   "ci": [
+    -0.0072,
+    0.0153
+   ],
+   "replicates": [
+    -0.0085,
+    0.017
+   ],
+   "n_rep_negative": 3,
+   "mean_change": 0.0034,
+   "r2": 0.007
+  },
+  "rf_proximity|sd=0.1|signed": {
+   "slope": -0.0058,
+   "ci": [
+    -0.0155,
+    0.0039
+   ],
+   "replicates": [
+    -0.0104,
+    -0.0006
+   ],
+   "n_rep_negative": 4,
+   "mean_change": -0.0046,
+   "r2": 0.021
+  },
+  "rf_proximity|sd=0.1|absolute": {
+   "slope": 0.0112,
+   "ci": [
+    -0.0015,
+    0.0239
+   ],
+   "replicates": [
+    -0.009,
+    0.0213
+   ],
+   "n_rep_negative": 1,
+   "mean_change": 0.0045,
+   "r2": 0.043
+  },
+  "euclidean|sd=0.2|signed": {
+   "slope": -0.0097,
+   "ci": [
+    -0.0205,
+    0.0011
+   ],
+   "replicates": [
+    -0.0327,
+    0.0025
+   ],
+   "n_rep_negative": 3,
+   "mean_change": -0.0046,
+   "r2": 0.039
+  },
+  "euclidean|sd=0.2|absolute": {
+   "slope": 0.0017,
+   "ci": [
+    -0.0112,
+    0.0146
+   ],
+   "replicates": [
+    -0.0138,
+    0.0307
+   ],
+   "n_rep_negative": 2,
+   "mean_change": -0.004,
+   "r2": 0.001
+  },
+  "genetic_mahalanobis|sd=0.2|signed": {
+   "slope": -0.0114,
+   "ci": [
+    -0.0211,
+    -0.0016
+   ],
+   "replicates": [
+    -0.0367,
+    0.01
+   ],
+   "n_rep_negative": 3,
+   "mean_change": 0.0065,
+   "r2": 0.068
+  },
+  "genetic_mahalanobis|sd=0.2|absolute": {
+   "slope": 0.0106,
+   "ci": [
+    -0.0011,
+    0.0223
+   ],
+   "replicates": [
+    0.003,
+    0.0164
+   ],
+   "n_rep_negative": 0,
+   "mean_change": 0.0015,
+   "r2": 0.03
+  },
+  "learned_weights|sd=0.2|signed": {
+   "slope": -0.0036,
+   "ci": [
+    -0.0128,
+    0.0057
+   ],
+   "replicates": [
+    -0.0182,
+    0.009
+   ],
+   "n_rep_negative": 3,
+   "mean_change": -0.0013,
+   "r2": 0.008
+  },
+  "learned_weights|sd=0.2|absolute": {
+   "slope": -0.0009,
+   "ci": [
+    -0.0127,
+    0.0108
+   ],
+   "replicates": [
+    -0.0157,
+    0.014
+   ],
+   "n_rep_negative": 2,
+   "mean_change": 0.0072,
+   "r2": 0.002
+  },
+  "lpa_guided|sd=0.2|signed": {
+   "slope": -0.0158,
+   "ci": [
+    -0.0276,
+    -0.004
+   ],
+   "replicates": [
+    -0.0465,
+    -0.0015
+   ],
+   "n_rep_negative": 4,
+   "mean_change": -0.0077,
+   "r2": 0.088
+  },
+  "lpa_guided|sd=0.2|absolute": {
+   "slope": 0.0049,
+   "ci": [
+    -0.0092,
+    0.019
+   ],
+   "replicates": [
+    -0.0045,
+    0.0371
+   ],
+   "n_rep_negative": 2,
+   "mean_change": -0.0026,
+   "r2": 0.004
+  },
+  "mahalanobis|sd=0.2|signed": {
+   "slope": -0.015,
+   "ci": [
+    -0.0257,
+    -0.0042
+   ],
+   "replicates": [
+    -0.0321,
+    0.0031
+   ],
+   "n_rep_negative": 3,
+   "mean_change": -0.0011,
+   "r2": 0.096
+  },
+  "mahalanobis|sd=0.2|absolute": {
+   "slope": 0.0033,
+   "ci": [
+    -0.0101,
+    0.0166
+   ],
+   "replicates": [
+    0.0014,
+    0.0066
+   ],
+   "n_rep_negative": 0,
+   "mean_change": -0.0009,
+   "r2": 0.003
+  },
+  "mutual_information|sd=0.2|signed": {
+   "slope": -0.0067,
+   "ci": [
+    -0.0161,
+    0.0027
+   ],
+   "replicates": [
+    -0.0271,
+    0.0061
+   ],
+   "n_rep_negative": 3,
+   "mean_change": -0.0034,
+   "r2": 0.03
+  },
+  "mutual_information|sd=0.2|absolute": {
+   "slope": 0.0016,
+   "ci": [
+    -0.0121,
+    0.0152
+   ],
+   "replicates": [
+    -0.0168,
+    0.0236
+   ],
+   "n_rep_negative": 2,
+   "mean_change": -0.0008,
+   "r2": 0.001
+  },
+  "rf_proximity|sd=0.2|signed": {
+   "slope": -0.0087,
+   "ci": [
+    -0.0172,
+    -0.0002
+   ],
+   "replicates": [
+    -0.0221,
+    -0.0025
+   ],
+   "n_rep_negative": 4,
+   "mean_change": 0.0028,
+   "r2": 0.049
+  },
+  "rf_proximity|sd=0.2|absolute": {
+   "slope": 0.0065,
+   "ci": [
+    -0.0048,
+    0.0179
+   ],
+   "replicates": [
+    -0.0141,
+    0.0246
+   ],
+   "n_rep_negative": 1,
+   "mean_change": 0.0005,
+   "r2": 0.017
+  }
+ }
+}

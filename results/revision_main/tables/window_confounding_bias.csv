@@ -1,0 +1,15 @@
+method,metric,model,n_experiments,slope_window,ci_low,ci_high,slope_eligibility,eligibility_ci_low,eligibility_ci_high
+euclidean,bias,unadjusted,90,-0.00270459,-0.00525088,-0.000158302,,,
+euclidean,bias,adjusted,90,-1.53142e-05,-0.00256769,0.00253706,0.0874548,0.0442542,0.130655
+mahalanobis,bias,unadjusted,90,-0.00295623,-0.0056215,-0.000290958,,,
+mahalanobis,bias,adjusted,90,-0.000484587,-0.0031962,0.00222703,0.0803774,0.0368885,0.123866
+lpa_guided,bias,unadjusted,90,-0.00341367,-0.00606699,-0.000760341,,,
+lpa_guided,bias,adjusted,90,-0.000719421,-0.00340467,0.00196583,0.0876164,0.0402369,0.134996
+genetic_mahalanobis,bias,unadjusted,90,0.00442563,0.00230513,0.00654613,,,
+genetic_mahalanobis,bias,adjusted,90,0.00766273,0.00561291,0.00971255,0.10527,0.0793941,0.131146
+learned_weights,bias,unadjusted,90,0.0041152,0.00234988,0.00588051,,,
+learned_weights,bias,adjusted,90,0.00716733,0.00559838,0.00873628,0.099255,0.0794904,0.11902
+mutual_information,bias,unadjusted,90,0.00492307,0.00304192,0.00680423,,,
+mutual_information,bias,adjusted,90,0.00769004,0.00575556,0.00962452,0.0899812,0.0658181,0.114144
+rf_proximity,bias,unadjusted,90,-0.00169989,-0.00286999,-0.000529784,,,
+rf_proximity,bias,adjusted,90,0.000469515,-0.00029773,0.00123676,0.0705486,0.0614999,0.0795973

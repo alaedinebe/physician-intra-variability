@@ -1,0 +1,158 @@
+{
+  "progressive_bias": {
+    "euclidean": [
+      0.0286,
+      0.0217,
+      0.0355
+    ],
+    "mahalanobis": [
+      0.0355,
+      0.0283,
+      0.0427
+    ],
+    "lpa_guided": [
+      0.0352,
+      0.0277,
+      0.0427
+    ],
+    "genetic_mahalanobis": [
+      0.004,
+      -0.0018,
+      0.0099
+    ],
+    "learned_weights": [
+      -0.01,
+      -0.0148,
+      -0.0053
+    ],
+    "mutual_information": [
+      -0.0071,
+      -0.0124,
+      -0.0018
+    ],
+    "rf_proximity": [
+      -0.0416,
+      -0.0444,
+      -0.0388
+    ]
+  },
+  "progressive_mae": {
+    "euclidean": [
+      0.0619,
+      0.0586,
+      0.0653
+    ],
+    "mahalanobis": [
+      0.0655,
+      0.0616,
+      0.0692
+    ],
+    "lpa_guided": [
+      0.0665,
+      0.0626,
+      0.0704
+    ],
+    "genetic_mahalanobis": [
+      0.0489,
+      0.0464,
+      0.0515
+    ],
+    "learned_weights": [
+      0.0453,
+      0.0429,
+      0.0477
+    ],
+    "mutual_information": [
+      0.0473,
+      0.0449,
+      0.0496
+    ],
+    "rf_proximity": [
+      0.0455,
+      0.0429,
+      0.048
+    ]
+  },
+  "progressive_calibration_slope": {
+    "euclidean": [
+      0.6991,
+      0.6741,
+      0.7233
+    ],
+    "mahalanobis": [
+      0.6716,
+      0.6479,
+      0.6956
+    ],
+    "lpa_guided": [
+      0.6737,
+      0.6463,
+      0.6998
+    ],
+    "genetic_mahalanobis": [
+      0.7897,
+      0.771,
+      0.8077
+    ],
+    "learned_weights": [
+      0.8512,
+      0.8348,
+      0.8673
+    ],
+    "mutual_information": [
+      0.8306,
+      0.812,
+      0.8486
+    ],
+    "rf_proximity": [
+      0.9319,
+      0.9243,
+      0.9397
+    ]
+  },
+  "noise_floor_mae_by_family": {
+    "continuous": 0.0206,
+    "latent": 0.014,
+    "progressive": 0.0165,
+    "score2": 0.0109,
+    "sensitivity_diabetes_hba1c": 0.0175,
+    "sensitivity_independent": 0.0112
+  },
+  "continuous_spearman_median_p2.5_p97.5": {
+    "euclidean": [
+      0.513,
+      0.229,
+      0.714
+    ],
+    "mahalanobis": [
+      0.471,
+      0.204,
+      0.701
+    ],
+    "lpa_guided": [
+      0.401,
+      0.072,
+      0.624
+    ],
+    "learned_weights": [
+      0.73,
+      0.557,
+      0.837
+    ],
+    "mutual_information": [
+      0.694,
+      0.467,
+      0.841
+    ],
+    "rf_proximity": [
+      0.715,
+      0.489,
+      0.832
+    ],
+    "glmm": [
+      0.727,
+      0.57,
+      0.854
+    ]
+  }
+}

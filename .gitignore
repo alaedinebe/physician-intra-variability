@@ -4,7 +4,8 @@ __pycache__/
 .venv/
 venv/
 
-# Benchmark outputs (large; archived separately with a persistent identifier)
+# Benchmark outputs. Only the summary tables, the E2 report and the run
+# manifests are tracked (added explicitly); the rest is large and regenerable.
 results/
 experiments/
 

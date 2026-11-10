@@ -1,0 +1,3082 @@
+{
+  "launch_id": "20261008T185504Z",
+  "code_fingerprint": "cfe1140a5114",
+  "created_utc": "2026-10-08T18:55:04.337424+00:00",
+  "git_commit": "ee745921ae22510484c7f1acac87e6c9f75ccb9b",
+  "git_uncommitted_changes": false,
+  "python": "3.11.17 (main, Oct  1 2026, 00:48:48) [Clang 21.0.0 (clang-2100.3.34.2)]",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "processor": "arm",
+  "cpu_count": 12,
+  "libraries": {
+    "numpy": "2.0.2",
+    "pandas": "2.2.3",
+    "scipy": "1.14.0",
+    "sklearn": "1.5.0",
+    "statsmodels": "0.14.2"
+  },
+  "config": {
+    "run_id": "revision_main",
+    "output_dir": "results",
+    "seed": 42,
+    "k_folds": 5,
+    "caliper_percentile": 25.0,
+    "threshold_strategy": "target_joint",
+    "covariate_model": "literature",
+    "hba1c_law": "lognormal",
+    "genetic": {
+      "enabled": true,
+      "variant": "genmatch",
+      "also_run_variants": [
+        "legacy"
+      ],
+      "workers": -1
+    },
+    "glmm_variants": {
+      "enabled": true
+    },
+    "glmm_diagnostics": {
+      "enabled": true,
+      "families": [
+        "score2",
+        "progressive",
+        "sensitivity_independent",
+        "sensitivity_diabetes_hba1c"
+      ],
+      "n_boot": 2000
+    },
+    "method_rules": {
+      "genetic_mahalanobis": {
+        "exclude_designs": [
+          "lopo"
+        ],
+        "exclude_families": [
+          "continuous"
+        ],
+        "designs_only_in_families": {
+          "kfold": [
+            "score2"
+          ],
+          "external": [
+            "score2"
+          ]
+        }
+      },
+      "glmm_oracle": {
+        "exclude_families": [
+          "continuous",
+          "latent",
+          "sensitivity_independent",
+          "sensitivity_diabetes_hba1c"
+        ]
+      },
+      "glmm_interactions": {
+        "exclude_families": [
+          "continuous",
+          "latent",
+          "sensitivity_independent",
+          "sensitivity_diabetes_hba1c"
+        ]
+      },
+      "glmm_splines": {
+        "exclude_families": [
+          "continuous",
+          "latent",
+          "sensitivity_independent",
+          "sensitivity_diabetes_hba1c"
+        ]
+      },
+      "gbm_offset": {
+        "exclude_families": [
+          "continuous",
+          "latent",
+          "sensitivity_independent",
+          "sensitivity_diabetes_hba1c"
+        ]
+      },
+      "genetic_mahalanobis_legacy": {
+        "exclude_designs": [
+          "fold_restricted",
+          "kfold",
+          "lopo",
+          "external",
+          "oracle_eligible",
+          "oracle_ineligible"
+        ],
+        "exclude_families": [
+          "continuous",
+          "progressive",
+          "sensitivity_diabetes_hba1c",
+          "latent"
+        ]
+      }
+    },
+    "families": {
+      "score2": {
+        "enabled": true,
+        "n_patients": 10000,
+        "n_physicians": 20,
+        "seed": 142,
+        "designs": [
+          "in_sample",
+          "fold_restricted",
+          "kfold",
+          "lopo",
+          "external",
+          "oracle_eligible",
+          "oracle_ineligible"
+        ],
+        "caliper_sensitivity": [
+          10,
+          50,
+          null
+        ],
+        "caliper_sensitivity_designs": [
+          "in_sample",
+          "oracle_eligible"
+        ]
+      },
+      "progressive": {
+        "enabled": true,
+        "n_patients": 10000,
+        "n_physicians": 20,
+        "n_passes": 2,
+        "seed": 42,
+        "designs": [
+          "in_sample",
+          "fold_restricted",
+          "oracle_eligible",
+          "oracle_ineligible"
+        ],
+        "cross_fitting_every": 3,
+        "cross_fitting_designs": [
+          "kfold",
+          "lopo",
+          "external"
+        ],
+        "caliper_sensitivity": [
+          10,
+          50,
+          null
+        ],
+        "caliper_sensitivity_designs": [
+          "in_sample",
+          "oracle_eligible"
+        ]
+      },
+      "sensitivity_independent": {
+        "enabled": true,
+        "n_patients": 10000,
+        "n_physicians": 20,
+        "seed": 242,
+        "covariate_model": "submission",
+        "hba1c_law": "normal",
+        "designs": [
+          "in_sample",
+          "oracle_eligible",
+          "oracle_ineligible"
+        ]
+      },
+      "sensitivity_diabetes_hba1c": {
+        "enabled": true,
+        "n_patients": 10000,
+        "n_physicians": 20,
+        "seed": 342,
+        "hba1c_law": "lognormal_diabetes_mixture",
+        "designs": [
+          "in_sample",
+          "oracle_eligible",
+          "oracle_ineligible"
+        ]
+      },
+      "latent": {
+        "enabled": true,
+        "n_patients": 10000,
+        "n_physicians": 20,
+        "seed": 542,
+        "gammas": [
+          0,
+          0.5,
+          1,
+          2,
+          4
+        ],
+        "n_replicates": 3,
+        "designs": [
+          "in_sample",
+          "oracle_eligible"
+        ]
+      },
+      "continuous": {
+        "enabled": true,
+        "n_patients": 20000,
+        "n_physicians": 50,
+        "seed": 442,
+        "n_replicates": 200,
+        "designs": [
+          "in_sample",
+          "oracle_eligible"
+        ],
+        "cross_fitting_replicates": 10,
+        "cross_fitting_designs": [
+          "fold_restricted",
+          "kfold",
+          "lopo",
+          "external"
+        ]
+      }
+    }
+  },
+  "n_experiments": 308,
+  "experiments": [
+    {
+      "experiment_id": "score2",
+      "family": "score2",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "kfold",
+        "lopo",
+        "external",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w1_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w1_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w1_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w1_s3",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w1_s4",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w1_s5",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w1_s6",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w1_s7",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w1_s8",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w2_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w2_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w2_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w2_s3",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w2_s4",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w2_s5",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w2_s6",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w2_s7",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w3_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w3_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w3_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w3_s3",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w3_s4",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w3_s5",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w3_s6",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w4_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w4_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w4_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w4_s3",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w4_s4",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w4_s5",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w5_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w5_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w5_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w5_s3",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w5_s4",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w6_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w6_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w6_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w6_s3",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w7_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w7_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w7_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w8_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w8_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p1_w9_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w1_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w1_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w1_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w1_s3",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w1_s4",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w1_s5",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w1_s6",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w1_s7",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w1_s8",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w2_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w2_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w2_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w2_s3",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w2_s4",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w2_s5",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w2_s6",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w2_s7",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w3_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w3_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w3_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w3_s3",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w3_s4",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w3_s5",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w3_s6",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w4_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w4_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w4_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w4_s3",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w4_s4",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w4_s5",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w5_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w5_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w5_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w5_s3",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w5_s4",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w6_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w6_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w6_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w6_s3",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w7_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w7_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w7_s2",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w8_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w8_s1",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "prog_p2_w9_s0",
+      "family": "progressive",
+      "designs": [
+        "in_sample",
+        "fold_restricted",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "sensitivity_independent",
+      "family": "sensitivity_independent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "sensitivity_diabetes_hba1c",
+      "family": "sensitivity_diabetes_hba1c",
+      "designs": [
+        "in_sample",
+        "oracle_eligible",
+        "oracle_ineligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g0_r00",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g0.5_r00",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g1_r00",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g2_r00",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g4_r00",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g0_r01",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g0.5_r01",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g1_r01",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g2_r01",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g4_r01",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g0_r02",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g0.5_r02",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g1_r02",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g2_r02",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "latent_g4_r02",
+      "family": "latent",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r000",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible",
+        "fold_restricted",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r001",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible",
+        "fold_restricted",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r002",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible",
+        "fold_restricted",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r003",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible",
+        "fold_restricted",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r004",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible",
+        "fold_restricted",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r005",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible",
+        "fold_restricted",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r006",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible",
+        "fold_restricted",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r007",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible",
+        "fold_restricted",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r008",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible",
+        "fold_restricted",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r009",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible",
+        "fold_restricted",
+        "kfold",
+        "lopo",
+        "external"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r010",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r011",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r012",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r013",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r014",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r015",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r016",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r017",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r018",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r019",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r020",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r021",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r022",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r023",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r024",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r025",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r026",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r027",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r028",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r029",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r030",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r031",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r032",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r033",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r034",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r035",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r036",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r037",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r038",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r039",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r040",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r041",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r042",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r043",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r044",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r045",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r046",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r047",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r048",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r049",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r050",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r051",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r052",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r053",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r054",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r055",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r056",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r057",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r058",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r059",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r060",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r061",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r062",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r063",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r064",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r065",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r066",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r067",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r068",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r069",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r070",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r071",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r072",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r073",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r074",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r075",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r076",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r077",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r078",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r079",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r080",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r081",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r082",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r083",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r084",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r085",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r086",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r087",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r088",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r089",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r090",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r091",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r092",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r093",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r094",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r095",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r096",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r097",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r098",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r099",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r100",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r101",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r102",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r103",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r104",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r105",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r106",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r107",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r108",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r109",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r110",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r111",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r112",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r113",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r114",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r115",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r116",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r117",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r118",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r119",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r120",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r121",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r122",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r123",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r124",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r125",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r126",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r127",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r128",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r129",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r130",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r131",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r132",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r133",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r134",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r135",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r136",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r137",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r138",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r139",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r140",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r141",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r142",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r143",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r144",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r145",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r146",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r147",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r148",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r149",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r150",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r151",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r152",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r153",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r154",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r155",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r156",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r157",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r158",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r159",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r160",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r161",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r162",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r163",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r164",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r165",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r166",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r167",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r168",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r169",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r170",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r171",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r172",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r173",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r174",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r175",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r176",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r177",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r178",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r179",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r180",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r181",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r182",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r183",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r184",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r185",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r186",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r187",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r188",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r189",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r190",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r191",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r192",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r193",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r194",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r195",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r196",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r197",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r198",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    },
+    {
+      "experiment_id": "continuous_r199",
+      "family": "continuous",
+      "designs": [
+        "in_sample",
+        "oracle_eligible"
+      ]
+    }
+  ],
+  "columns": {
+    "run_id": "Identifier of the run (configuration name).",
+    "experiment_id": "Unique experiment identifier.",
+    "family": "score2 | progressive | sensitivity_independent | sensitivity_diabetes_hba1c | latent | continuous.",
+    "replicate": "Replicate index (Monte Carlo replications of a family).",
+    "seed": "Master seed of the experiment.",
+    "latent_gamma": "Scenario E1: influence of the unobserved determinant U (NaN elsewhere).",
+    "pass_index": "Progressive rules: pass (1 or 2); 0 otherwise.",
+    "window_size": "Progressive rules: number of covariates in the rule; 0 for SCORE2.",
+    "window_start": "Progressive rules: position of the window in the covariate list.",
+    "rule_variables": "Covariates of the eligibility rule (';'-separated).",
+    "n_binary_rule_variables": "Number of binary covariates in the rule.",
+    "threshold_strategy": "Threshold calibration strategy of progressive rules.",
+    "target_eligibility": "Target joint eligibility p* (progressive rules).",
+    "realised_eligibility": "Realised eligible fraction in the cohort.",
+    "max_attainable_eligibility": "Largest eligibility reachable by the window (target_joint).",
+    "calibration_attainable": "Whether the target eligibility was reached within 0.01.",
+    "covariate_correlation": "Gaussian-copula correlation 'a~b:rho', empty if none.",
+    "hba1c_law": "HbA1c law: normal | lognormal | lognormal_diabetes_mixture.",
+    "covariate_model": "Covariate model: literature (revision) | submission (independent marginals).",
+    "n_patients_cohort": "Number of patients in the cohort.",
+    "n_physicians": "Number of physicians in the cohort.",
+    "physician": "Physician identifier.",
+    "physician_group": "Five-group design: group 1 to 5; empty for continuous heterogeneity.",
+    "p_high": "Prescribing probability for eligible patients.",
+    "p_low": "Prescribing probability for ineligible patients.",
+    "n_patients": "Patients of the physician.",
+    "n_eligible": "Truly eligible patients of the physician.",
+    "D_star": "Theoretical within-eligible discordance 2 p_high (1 - p_high).",
+    "D_star_intrinsic": "Intrinsic inconsistency (scenario E1: patients sharing the unobserved U); equals D_star elsewhere.",
+    "D_tilde": "Empirical discordance over all pairs of eligible patients (manual pairing).",
+    "D_star_ineligible": "Theoretical discordance among ineligible patients 2 p_low (1 - p_low).",
+    "D_tilde_ineligible": "Empirical discordance over all pairs of ineligible patients.",
+    "method": "Estimator name.",
+    "supervised": "Whether the estimator uses the outcome when learning.",
+    "design": "Evaluation design.",
+    "computed_as": "Design actually computed (identical by construction for unsupervised methods).",
+    "caliper_percentile": "Caliper percentile used for pairing (100 = no caliper; NaN for the GLMM).",
+    "score_type": "discordance | pearson_overdispersion.",
+    "score": "Estimated discordance rate, or GLMM mean squared Pearson residual.",
+    "n_candidates": "Patients in the physician's candidate pool for this design.",
+    "n_pairs": "Retained pairs.",
+    "n_patients_paired": "Patients appearing in at least one retained pair.",
+    "retention": "n_patients_paired / n_candidates.",
+    "caliper_threshold": "Caliper distance (mean over cells when pairing is within folds).",
+    "pair_distance_median": "Median distance of retained pairs.",
+    "pair_distance_q25": "25th percentile of retained-pair distances.",
+    "pair_distance_q75": "75th percentile of retained-pair distances.",
+    "pair_distance_p90": "90th percentile of retained-pair distances.",
+    "frac_pairs_both_eligible": "Share of pairs with both patients truly eligible.",
+    "frac_pairs_mixed": "Share of pairs with exactly one truly eligible patient.",
+    "frac_pairs_both_ineligible": "Share of pairs with no truly eligible patient.",
+    "disc_pairs_both_eligible": "Discordance among pairs with both patients eligible.",
+    "disc_pairs_mixed": "Discordance among mixed pairs.",
+    "disc_pairs_both_ineligible": "Discordance among pairs with both patients ineligible.",
+    "smd_within_max": "Max over covariates of the mean absolute within-pair difference, in cohort SD units.",
+    "smd_within_mean": "Mean over covariates of the same quantity.",
+    "fit_seconds": "Wall-clock time of fitting for this design (0 when the full-data fit is reused).",
+    "estimate_seconds": "Wall-clock time of distance computation, pairing and scoring for this design.",
+    "n_fits": "Number of fits performed for this design.",
+    "fit_reused": "Whether the full-data fit of in_sample was reused.",
+    "launch_id": "UTC timestamp of the launch that computed the experiment (YYYYmmddTHHMMSSZ).",
+    "code_fingerprint": "SHA-256 (12 hex) of src/**/*.py and of the resolved configuration."
+  },
+  "stale_shards": [],
+  "stale_policy": "none",
+  "workers": 1
+}

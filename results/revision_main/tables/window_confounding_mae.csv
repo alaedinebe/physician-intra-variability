@@ -1,0 +1,15 @@
+method,metric,model,n_experiments,slope_window,ci_low,ci_high,slope_eligibility,eligibility_ci_low,eligibility_ci_high
+euclidean,mae,unadjusted,90,-0.000563336,-0.00199329,0.000866614,,,
+euclidean,mae,adjusted,90,-0.000306337,-0.00172465,0.00111198,0.00835755,-0.01972,0.0364351
+mahalanobis,mae,unadjusted,90,-0.000952697,-0.00267605,0.000770657,,,
+mahalanobis,mae,adjusted,90,-0.000718746,-0.00229401,0.00085652,0.00760807,-0.0258953,0.0411114
+lpa_guided,mae,unadjusted,90,-0.0010231,-0.00275931,0.000713108,,,
+lpa_guided,mae,adjusted,90,-0.000716031,-0.00238417,0.000952105,0.00998589,-0.0230698,0.0430416
+genetic_mahalanobis,mae,unadjusted,90,0.00292964,0.00182432,0.00403497,,,
+genetic_mahalanobis,mae,adjusted,90,0.00242765,0.00120907,0.00364623,-0.0163247,-0.033116,0.000466652
+learned_weights,mae,unadjusted,90,0.00228091,0.00120893,0.00335288,,,
+learned_weights,mae,adjusted,90,0.000920319,-7.59822e-05,0.00191662,-0.044246,-0.0579008,-0.0305913
+mutual_information,mae,unadjusted,90,0.00257678,0.00147618,0.00367738,,,
+mutual_information,mae,adjusted,90,0.00138819,0.000333477,0.0024429,-0.0386528,-0.0523876,-0.024918
+rf_proximity,mae,unadjusted,90,0.00182407,0.000771295,0.00287685,,,
+rf_proximity,mae,adjusted,90,-0.00019812,-0.000799739,0.0004035,-0.0657614,-0.0729488,-0.0585739

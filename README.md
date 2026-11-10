@@ -1,114 +1,115 @@
-# Physician Intra-Variability
+# Physician intra-variability
 
-Pipeline for analyzing intra-physician prescription variability from synthetic SCORE2 cohorts and several comparison methods (GLMM + matching).
+Code for the simulation study "Evaluating estimators of within-physician prescribing discordance: a synthetic-ground-truth simulation study" (revised manuscript, release `v2.0-revision`).
 
-This repository is a focused version of the analysis code and synthetic generator used in the *intra-physician variability* study.
+The study generates synthetic patient cohorts in which the prescribing rule of every physician is known, so that the true within-eligible prescribing discordance of each physician is known by construction. It then measures how well eight estimators recover it: seven matching estimators (Euclidean, Mahalanobis, LPA-guided, Genetic Mahalanobis, Learned Weights, Mutual Information, Random Forest Proximity) and a generalized linear mixed model (GLMM).
 
-## Overview
-
-This repository lets you:
-
-- generate synthetic patient cohorts under controlled clinical rules;
-- run a multi-method statistical pipeline;
-- compare approaches for estimating intra-physician discordance;
-- produce reproducible artifacts (CSV, JSON reports, figures, effective configuration).
-
-The entry point is `main.py`. The analytical core lives in `src/analysis/analysis_pipeline.py` and the synthetic generator in `src/synthetic_generator.py`.
+No patient data are used. Every dataset is regenerated from the code and the configurations in `configs/`.
 
 ## Project structure
 
 ```text
 .
-├── configs/                    # YAML configurations
-├── experiments/                # Timestamped run outputs
+├── configs/                    # One YAML file per family of experiments
 ├── src/
-│   ├── analysis/               # Analytical pipeline, matching, visualizations
-│   └── synthetic_generator.py  # Synthetic SCORE2 cohort generation
-├── main.py                     # CLI orchestrator
-└── LICENSE
+│   ├── synthetic_generator.py  # Synthetic cohorts, eligibility rules, physician models
+│   ├── benchmark/              # Benchmark of the revised manuscript
+│   │   ├── estimators.py       #   one class per estimator
+│   │   ├── designs.py          #   in-sample, cross-fitted and oracle designs
+│   │   ├── runner.py           #   experimental plan and long output table
+│   │   ├── metrics.py          #   performance measures and summary tables
+│   │   └── glmm_diagnostics.py #   GLMM specifications and diagnostics
+│   └── analysis/               # Pipeline of the first submission (see below)
+├── scripts/                    # Tables and figures of the manuscript
+├── tests/                      # Unit tests
+├── dev/                        # Development checks
+└── main.py                     # Entry point of the first-submission pipeline
 ```
-
-## Prerequisites
-
-- Python 3.11 or newer
-- Python dependencies listed below
 
 ## Installation
 
-Create a virtual environment, then install dependencies:
+Python 3.11 or newer.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install pandas pyyaml numpy scipy scikit-learn matplotlib seaborn adjustText statsmodels
+pip install -r requirements.txt
 ```
 
-## Running
+## Reproducing the manuscript
 
-### Standard run
+All commands are run from the repository root. Outputs are written to `results/<run_id>/`.
+
+Each configuration file can be inspected or checked quickly before a full run:
+
+```bash
+python -m src.benchmark.runner --config configs/benchmark.yaml --list    # print the plan
+python -m src.benchmark.runner --config configs/benchmark.yaml --smoke   # small end-to-end check
+```
+
+### 1. Run the experiments
+
+| Experiments | Configuration | Output directory |
+|---|---|---|
+| Main benchmark: SCORE2 reference experiment, continuous heterogeneity, progressive multi-rule experiments, unobserved determinant, sensitivity analyses | `configs/benchmark.yaml` | `results/revision_main` |
+| Monte Carlo grids over cohort size and number of physicians | `configs/grids.yaml` | `results/revision_grids` |
+| Grid cells with small physician panels | `configs/grids_small.yaml` | `results/revision_grids_small` |
+| GLMM specifications under continuous heterogeneity | `configs/glmm_continuous.yaml` | `results/revision_glmm_continuous` |
+| Physician-specific eligibility thresholds | `configs/physician_thresholds.yaml` | `results/revision_physician_thresholds` |
+
+```bash
+python -m src.benchmark.runner --config configs/benchmark.yaml
+python -m src.benchmark.runner --config configs/grids.yaml --workers 4
+python -m src.benchmark.runner --config configs/grids_small.yaml --workers 4
+python -m src.benchmark.runner --config configs/glmm_continuous.yaml --workers 4
+python -m src.benchmark.runner --config configs/physician_thresholds.yaml --workers 4
+```
+
+Runs are resumable: each experiment is written to its own file as soon as it finishes, and an interrupted run skips the experiments already done. Runtimes measured with `--workers` above 1 are not comparable with those of a single-worker run.
+
+### 2. Compute the performance measures
+
+```bash
+python -m src.benchmark.metrics --run results/revision_main
+python -m src.benchmark.metrics --run results/revision_grids --add-run results/revision_grids_small
+python -m src.benchmark.metrics --run results/revision_glmm_continuous
+python -m src.benchmark.metrics --run results/revision_physician_thresholds
+```
+
+Each command writes summary tables to `<run>/tables/`.
+
+### 3. Build the tables and figures
+
+```bash
+python scripts/manuscript_tables.py             # results/manuscript/tables/
+python scripts/manuscript_figures.py            # results/manuscript/figures/
+python scripts/physician_thresholds_report.py   # results/revision_physician_thresholds/report/
+```
+
+## Result tables
+
+The summary tables behind the numbers of the manuscript are included, so that they can be checked without rerunning the simulations:
+
+| Directory | Content |
+|---|---|
+| `results/revision_main/tables/` | Main benchmark |
+| `results/revision_grids/tables/` | Monte Carlo grids, small-panel cells included |
+| `results/revision_glmm_continuous/tables/` | GLMM specifications under continuous heterogeneity |
+| `results/revision_physician_thresholds/tables/` and `report/` | Physician-specific thresholds: summary tables, Table S12, Figure S1 |
+
+Each run directory also contains `manifest.json`, which records the commit, the code fingerprint, the library versions and the resolved configuration of the run. The long tables with one row per experiment, method, design and physician (`benchmark_long.csv.gz`) are not included because of their size; step 1 regenerates them.
+
+## Provenance
+
+Every row of the output table records the identifier of the launch and a fingerprint of the code and of the resolved configuration (SHA-256 of every `src/**/*.py` file and of the configuration). Results computed with a different version of the code cannot be mixed by mistake: if the code or the configuration has changed, the runner stops and lists the experiments concerned.
+
+## First-submission pipeline
+
+`main.py`, `src/analysis/` and `configs/article_stats.yaml` are the pipeline of the first submission. They are kept for reference and are not used by the revised manuscript.
 
 ```bash
 python main.py --config configs/article_stats.yaml
 ```
-
-Results are written to `experiments/<date>/exp_<experiment_name>/`, with a copy of the effective configuration (`config_used.yaml`).
-
-### Synthetic generation strategies
-
-In `configs/article_stats.yaml`, the field `dataset.generation_strategy` accepts:
-
-| Strategy | Description |
-|----------|-------------|
-| `score2_five_groups_heter_patients` | 20 physicians split into 5 groups with fixed prescription probabilities (default) |
-| `score2_continuous_heterogeneity` | Continuous heterogeneity: each physician draws its own `p_high` |
-| `score2_latent_covariate` | Latent covariate influencing prescription in the SCORE2 borderline zone |
-
-Additional generator options:
-
-- `dataset.covariate_correlation`: controlled correlation between two covariates (Gaussian copula);
-- `dataset.hba1c_distribution`: HbA1c distribution (`normal` or `lognormal`);
-- `dataset.save_raw_csv: true`: export the raw dataset to `data/dataset.csv`.
-
-> **Note:** `main.py` only supports synthetic generation (`dataset.source: synthetic`). Other modes described in the YAML are ignored with a warning.
-
-## Analysis methods
-
-The pipeline compares, among others:
-
-1. **Manual Pairing** — positive control based on the generation clinical rule;
-2. **Euclidean / Mahalanobis / Learned Weights** — distance-based matching in covariate space;
-3. **Genetic Matching** — optimization of covariate weights;
-4. **Random Forest Proximity / Mutual Information** — learned similarity;
-5. **LPA-guided Pairing** — pairing guided by a latent Gaussian mixture;
-6. **Bayesian GLMM** — physician random effects and local overdispersion;
-7. **Ensemble** — aggregation of the scores above.
-
-Parameters (fixed effects, caliper, pairing strategy, LPA, etc.) are configured in the `analysis` section of the YAML.
-
-## Main outputs
-
-After a successful run, the results directory contains in particular:
-
-| File / folder | Content |
-|---------------|---------|
-| `config_used.yaml` | Effective run configuration |
-| `intra_physician_variability.csv` | Discordance scores per physician and per method |
-| `global_correlations.csv` | Global correlations between methods |
-| `within_group_spearman.csv` | Within-group Spearman correlations |
-| `glmm/` | JSON report, calibration curves, Pearson residuals |
-| `clinical_reviews/` | Matched pairs exported per method |
-| `plots/method_comparison/comparison_3panels.png` | Visual comparison of methods |
-
-In `score2_continuous_heterogeneity` mode, additional metrics are produced (`continuous_heterogeneity_*.csv` and associated figures).
-
-## Configuration
-
-The file `configs/article_stats.yaml` groups:
-
-- project metadata and random seed;
-- paths and experiment naming;
-- synthetic generation parameters;
-- analysis pipeline configuration (GLMM, caliper, LPA, fixed effects).
 
 ## Tests
 
